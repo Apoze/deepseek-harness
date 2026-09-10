@@ -27,6 +27,7 @@ import {
   assertNoActiveCompaction,
   compactSurfaceRegion,
   selectCompactableRange,
+  smallerCompactableRange,
 } from './region.ts'
 import { summarizeWithLlm } from './summarizer.ts'
 import type { SummarizationInput, SummaryResult } from './summarizer.ts'
@@ -84,10 +85,14 @@ const modelPolicy: z<ModelCompactPolicyConfig> = z.object({
   provider: z.string().required(),
   model: z.string().required(),
   thresholdRatio: thresholdRatioSchema,
+  targetRatio: thresholdRatioSchema,
   retainRatio: retainRatioSchema,
   retainTokens: retainTokensSchema,
   summarizationProvider: summarizationProviderSchema,
   summarizationModel: summarizationModelSchema,
+  admission: z.union(['step', 'prepared']),
+  summarizationReasoningEffort: z.string(),
+  summarizationTools: z.boolean(),
   maxTokens: maxTokensSchema,
   compactionRetries: compactionRetriesSchema,
   maxOverflowRetries: maxOverflowRetriesSchema,
@@ -106,10 +111,14 @@ export class BasicCompactionEngine extends CompactionEngine {
 
   static Config: z<BasicCompactionConfig> = z.object({
     thresholdRatio: thresholdRatioSchema,
+    targetRatio: thresholdRatioSchema,
     retainRatio: retainRatioSchema,
     retainTokens: retainTokensSchema,
     summarizationProvider: summarizationProviderSchema,
     summarizationModel: summarizationModelSchema,
+    admission: z.union(['step', 'prepared']),
+    summarizationReasoningEffort: z.string(),
+    summarizationTools: z.boolean(),
     maxTokens: maxTokensSchema,
     compactionRetries: compactionRetriesSchema,
     maxOverflowRetries: maxOverflowRetriesSchema,
@@ -264,6 +273,7 @@ export class BasicCompactionEngine extends CompactionEngine {
     const target = routedTarget(agent.session)
     if (target === undefined) return null
     const policy = resolveTargetPolicy(this.config, target)
+    if (trigger === 'pressure' && policy.admission === 'prepared') return null
     const meter = this.ctx.tokenMeter
     let measurement = meter.measure(agent.session)
     switch (trigger) {
@@ -286,9 +296,33 @@ export class BasicCompactionEngine extends CompactionEngine {
         prune.pruneSession(agent.session)
         measurement = meter.measure(agent.session)
       }
-      const range = selectCompactableRange(agent.session, measurement, 0)
+      // Prepared admission chooses a retained tail from the total target; exact
+      // admission re-counts the rebuilt request after this transaction returns.
+      const inspection = policy.admission === 'prepared'
+        ? agent.session.snapshotEvents().findLast(event => event.type === 'llm/request-inspected')
+        : undefined
+      const budget = inspection?.type === 'llm/request-inspected' ? inspection.data.inspection : undefined
+      const fixedTokens = Math.max(0, measurement.totalTokens - measurement.surfaceTokens)
+        + (measurement.nodes[0]?.tokens ?? 0)
+      const retainTokens = budget && policy.targetRatio !== undefined
+        ? Math.max(0, Math.floor(budget.contextWindow * policy.targetRatio) - fixedTokens - policy.maxTokens)
+        : 0
+      let range = selectCompactableRange(agent.session, measurement, retainTokens)
       if (range === null) return null
-      return this.compactRegion(range.start, range.end, agent, signal)
+      for (let attempt = 0; ; attempt += 1) {
+        signal.throwIfAborted()
+        try {
+          return await this.compactRegion(range.start, range.end, agent, signal)
+        } catch (error: unknown) {
+          signal.throwIfAborted()
+          if (!(error instanceof Error) || !('code' in error)
+            || error.code !== CONTEXT_WINDOW_EXCEEDED_CODE
+            || attempt >= policy.compactionRetries) throw error
+          const smaller = smallerCompactableRange(agent.session, range)
+          if (smaller === null) throw error
+          range = smaller
+        }
+      }
     }
 
     const context = (await this.ctx.llm.resolveModelInfo(target.provider, target.model, signal)).context

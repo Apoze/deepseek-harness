@@ -101,6 +101,10 @@ try {
 selector 必须是 owner currency 的纯函数。非 null 返回值作为 `matched` 传给组件；`PropsRuntime<'conversation.composer'>` 提供标准 Session 与 global props。Chain 顺序仍按 `priority` 升序，再按注册顺序；首个返回非 null 的 selector 获选。Shell 会在 takeover 下保持默认 composer 挂载。Request 状态、listener、response encoding 和任何 request-specific child slot 都属于业务 package，不进入 `SessionSnapshot`，也不由 core package 声明。
 
 <a id="model-experience"></a>
+## 准备后的上下文显示
+
+精确准备仍然有效时，上下文面板显示可用输出预算、工作预留和安全余量。只有该精确准备的占用量不带估算标记；系统、工具和消息分类仍然是估算值。后续上下文或路由变化会使显示的准备预算失效。
+
 ## 模型体验
 
 无，因为本包渲染浏览器状态，并通过 Session Controller API 发送用户确认提交的输入，而不构造模型请求。

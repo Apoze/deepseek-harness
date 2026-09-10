@@ -99,6 +99,10 @@ Read these pages when the plugin contract is not enough. They move from the wire
 -----
 
 <a id="model-experience"></a>
+## Persistent session identity
+
+Prompting an existing session id resumes it through the native agent registry when persistence is configured. The stored workspace must equal the initialized workspace; corruption and ownership conflicts remain errors. Both SDK languages use this server behavior. SDK compositions default to reporting an unresolved `max-tokens` turn as incomplete; a successful recovery before step completion can finish normally.
+
 ## Model Experience
 
 ### SDK user message

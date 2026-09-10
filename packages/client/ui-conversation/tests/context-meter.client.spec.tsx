@@ -28,6 +28,18 @@ function meter(values: Record<string, unknown>, translate: ContextMeterProps['t'
 }
 
 describe('ContextMeter', () => {
+  it('shows the exact preparation and available output separately from work reserve', () => {
+    const view = meter({ contextPressure: { pressureTokens: 90_000, projectedTokens: 90_000, contextWindow: 150_000,
+      preparedBudget: { inputTokens: 90_000, contextWindow: 150_000, outputTokens: 55_904, workReserve: 49_156, safetyMargin: 4096 },
+    } }, tEn)
+    fireEvent.click(view.getByRole('button', { name: '60% of context used' }))
+    const panel = view.getByRole('dialog')
+    expect(panel.textContent).toContain('90K / 150K')
+    expect(panel.textContent).not.toContain('~90K')
+    expect(panel.textContent).toContain('Available output budget55.9K')
+    expect(panel.textContent).toContain('Work reserve49.2K')
+  })
+
   it('computes occupancy only when both a numerator and capacity are known', () => {
     expect(contextOccupancy({ pressureTokens: 32_000, projectedTokens: 6_000, contextWindow: 128_000 }))
       .toEqual({ percent: 5, usedTokens: 6_000, contextWindow: 128_000 })

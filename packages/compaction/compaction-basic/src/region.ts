@@ -154,6 +154,28 @@ export function selectCompactableRange(
 }
 
 /**
+ * Halve an oversized summary region at a closed tool boundary, keeping the prefix.
+ * @param session - current durable surface.
+ * @param range - region whose auxiliary request could not fit.
+ * @returns a strictly shorter balanced region, or null for an indivisible input.
+ */
+export function smallerCompactableRange(
+  session: Session,
+  range: { start: SessionSeq; end: SessionSeq },
+): { start: SessionSeq; end: SessionSeq } | null {
+  const nodes = session.surface.nodes
+  const start = nodes.indexOf(range.start)
+  const end = nodes.indexOf(range.end)
+  for (let index = Math.floor((start + end) / 2); index >= start; index -= 1) {
+    const seq = nodes[index]
+    if (seq !== undefined && seq !== range.end && toolPairingBalancedAfter(session, seq)) {
+      return { start: range.start, end: seq }
+    }
+  }
+  return null
+}
+
+/**
  * Run the single compaction transaction over one selected positional span.
  * Selection and validation are read-only. Idle/log validation and
  * `compaction/start` are synchronously adjacent, so the durable opening marker is

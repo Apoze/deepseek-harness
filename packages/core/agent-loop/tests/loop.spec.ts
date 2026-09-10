@@ -1344,12 +1344,6 @@ describe('agent loop', () => {
       },
       {
         id: expect.any(String) as unknown,
-        role: 'assistant',
-        content: [{ type: 'text', text: 'first half' }],
-        source: { kind: 'model', provider: 'mock', model: 'mock' },
-      },
-      {
-        id: expect.any(String) as unknown,
         role: 'user',
         content: [{ type: 'text', text: 'continue after truncation' }],
         source: { kind: 'plugin', plugin: 'max-tokens-test' },
@@ -1415,67 +1409,22 @@ describe('agent loop', () => {
       source: { kind: 'user' },
     }])
     expect(reasons).toEqual([{ kind: 'max-tokens' }])
-    // Empty content still needs an assistant/message to carry usage; derivation
-    // skips that host so it does not create a spurious assistant turn.
-    const assistantMessage = agent.session.snapshotEvents().find(e => e.type === 'assistant/message')
-    expect(assistantMessage?.type === 'assistant/message' && assistantMessage.data).toMatchObject({
-      turn: 1,
-      step: 1,
-      message: {
-        id: expect.any(String) as unknown,
-        role: 'assistant',
-        content: [],
-        source: { kind: 'model', provider: 'mock', model: 'mock' },
-      },
-      usage: { inputTokens: 10, outputTokens: 5 },
+    const attempt = agent.session.snapshotEvents().find(e => e.type === 'assistant/attempt')
+    expect(attempt?.type === 'assistant/attempt' && attempt.data.stream).toContainEqual({
+      type: 'chunk', time: expect.any(Number) as unknown, chunk: { type: 'usage', usage: { inputTokens: 10, outputTokens: 5 } },
     })
+    expect(agent.session.snapshotEvents().some(e => e.type === 'assistant/message')).toBe(false)
   })
 
-  it('appends an empty completion anchor for a max-tokens step with no usage', async () => {
-    // The truncated tool call is dropped from durable content, while the
-    // successful provider call still needs an exact replay anchor.
-    const callId = ToolCallId('c1')
-    const adapter = new MockAdapter([[
-      { type: 'block-start', index: 0, blockType: 'tool-call' },
-      { type: 'tool-call-delta', index: 0, id: callId, name: 'echo', argumentsDelta: '{"text":"x"}' },
-      { type: 'block-end', index: 0, block: { type: 'tool-call', id: callId, name: 'echo', arguments: '{"text":"x"}' } },
-      { type: 'finish', reason: { kind: 'max-tokens' } },
-    ]])
-    const ctx = await harness(adapter)
-    ctx.tools.register(defineContentToolFixture({
-      name: 'echo',
-      description: '',
-      parameters: { text: { type: 'string' } },
-      async execute() { return [{ type: 'text', text: 'should not run' }] },
-    }))
+  it('retains a max-tokens attempt with no usage without creating a completion anchor', async () => {
+    const ctx = await harness(new MockAdapter([[{ type: 'finish', reason: { kind: 'max-tokens' } }]]))
     const agent = await ctx.agentLoop.create(SessionId('a1'), { provider: 'mock', model: 'mock' })
-
-    const reasons: TurnEndReason[] = []
-    ctx.on('session/event', (_s, event) => { if (event.type === 'turn/end') reasons.push(event.data.reason) })
-
     send(agent, 'go')
     await waitForIdle(ctx, agent)
-
-    expect(reasons).toEqual([{ kind: 'max-tokens' }])
-    const assistant = agent.session.snapshotEvents().find(e => e.type === 'assistant/message')!
-    expect(assistant.type === 'assistant/message' && assistant.data).toMatchObject({
-      turn: 1,
-      step: 1,
-      message: {
-        id: expect.any(String) as unknown,
-        role: 'assistant',
-        content: [],
-        source: { kind: 'model', provider: 'mock', model: 'mock' },
-      },
-    })
-    expect(assistant.sourceEventSeqs).toBeUndefined()
-    expect(assistant.type === 'assistant/message' ? assistant.data.stream.length : 0).toBeGreaterThan(0)
-    expect(agent.session.deriveMessages().slice(1)).toEqual([{
-      id: expect.any(String) as unknown,
-      role: 'user',
-      content: [{ type: 'text', text: 'go' }],
-      source: { kind: 'user' },
-    }])
+    const events = agent.session.snapshotEvents()
+    expect(events.filter(e => e.type === 'assistant/attempt')).toHaveLength(1)
+    expect(events.filter(e => e.type === 'assistant/message')).toHaveLength(0)
+    expect(events.filter(e => e.type === 'turn/end').at(-1)?.data.reason).toEqual({ kind: 'max-tokens' })
   })
 
   it('appends an empty completion anchor for a normal stop with no usage', async () => {
@@ -1513,7 +1462,7 @@ describe('agent loop', () => {
     }])
   })
 
-  it('keeps safe max-tokens assistant content while dropping truncated tool calls', async () => {
+  it('keeps a mixed truncated generation in diagnostics, outside the next request', async () => {
     const callId = ToolCallId('c1')
     const adapter = new MockAdapter([[
       { type: 'block-start', index: 0, blockType: 'text' },
@@ -1536,13 +1485,10 @@ describe('agent loop', () => {
     await waitForIdle(ctx, agent)
 
     expect(agent.session.snapshotEvents().some(e => e.type === 'tool/call')).toBe(false)
-    // The follow-up request replays the truncated message with its replay
-    // metadata pruned in step with the dropped tool call.
-    expect(adapter.requests[1]?.messages[2]?.source).toEqual({
-      kind: 'model',
-      provider: 'mock',
-      model: 'mock',
-      replayState: { response: { responseId: 'resp-1' }, blocks: ['text-meta'] },
+    expect(adapter.requests[1]?.messages.flatMap(message => message.content)).not.toContainEqual({ type: 'text', text: 'partial text' })
+    const attempt = agent.session.snapshotEvents().find(e => e.type === 'assistant/attempt')
+    expect(attempt?.type === 'assistant/attempt' && attempt.data.stream).toContainEqual({
+      type: 'text-chunks', time0: expect.any(Number) as unknown, index: 0, texts: ['partial text'], dt: [],
     })
     expect(agent.session.deriveMessages().slice(1)).toEqual([
       {
@@ -1550,17 +1496,6 @@ describe('agent loop', () => {
         role: 'user',
         content: [{ type: 'text', text: 'go' }],
         source: { kind: 'user' },
-      },
-      {
-        id: expect.any(String) as unknown,
-        role: 'assistant',
-        content: [{ type: 'text', text: 'partial text' }],
-        source: {
-          kind: 'model',
-          provider: 'mock',
-          model: 'mock',
-          replayState: { response: { responseId: 'resp-1' }, blocks: ['text-meta'] },
-        },
       },
       {
         id: expect.any(String) as unknown,

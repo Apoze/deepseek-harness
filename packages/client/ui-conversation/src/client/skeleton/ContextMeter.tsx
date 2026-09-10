@@ -138,7 +138,7 @@ export function ContextMeter({ useProjection, t }: ContextMeterProps) {
             {/* `~`: usedTokens prefers projectedTokens, whose surface delta is
                 heuristically repriced on top of the provider-anchored sample. */}
             <span className={css.figures}>
-              {`~${formatTokens(context.usedTokens, t)} / ${formatTokens(context.contextWindow, t)}`}
+              {`${pressure?.preparedBudget ? '' : '~'}${formatTokens(context.usedTokens, t)} / ${formatTokens(context.contextWindow, t)}`}
             </span>
           </div>
           <div className={css.bar}>
@@ -150,6 +150,13 @@ export function ContextMeter({ useProjection, t }: ContextMeterProps) {
               />
             ))}
           </div>
+          {pressure?.preparedBudget !== undefined && (
+            <dl className={css.rows}>
+              <div className={css.row}><dt>{t('context.outputBudget')}</dt><dd>{formatTokens(Math.max(0, pressure.preparedBudget.outputTokens), t)}</dd></div>
+              <div className={css.row}><dt>{t('context.workReserve')}</dt><dd>{formatTokens(pressure.preparedBudget.workReserve, t)}</dd></div>
+              <div className={css.row}><dt>{t('context.margin')}</dt><dd>{formatTokens(pressure.preparedBudget.safetyMargin, t)}</dd></div>
+            </dl>
+          )}
           {breakdown !== undefined && (
             <dl className={css.rows}>
               {ROWS.map(row => (

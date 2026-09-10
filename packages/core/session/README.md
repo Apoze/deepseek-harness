@@ -129,6 +129,10 @@ The package-level contract is enough for most consumers; read these when you nee
 -----
 
 <a id="model-experience"></a>
+## Generation preparation records
+
+`llm/request-inspected` and `agent/generation-recovery` are durable step-scoped facts without surface effects. The rejected provider stream stays in `assistant/attempt`; any technical recovery instruction enters the surface as an attributed `user/message`. These event types require a reader that knows them. A rollback uses the preserved prior session generation or backup, rather than asking an older reader to ignore required events.
+
 ## Model Experience
 
 ### Derived message history

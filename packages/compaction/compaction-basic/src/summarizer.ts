@@ -5,7 +5,7 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
-import { contentHasImage, createUserMessage, BlockAssembler, LlmError } from '@deepseek-ai/dsh-llm'
+import { contentHasImage, createUserMessage, BlockAssembler, LlmError, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import type {
   ContentBlock, FinishReason, GenerateOptions, Message, TokenUsage, ToolSchema,
 } from '@deepseek-ai/dsh-llm'
@@ -15,6 +15,8 @@ interface SummaryConfig {
   readonly summarizationProvider: string
   readonly summarizationModel: string
   readonly maxTokens: number
+  readonly summarizationTools?: boolean
+  readonly summarizationReasoningEffort?: string
 }
 
 /** Tags wrapping the structured summary inside the landed checkpoint node. */
@@ -152,19 +154,33 @@ export async function summarizeWithLlm(
     provider: target.provider,
     model: target.model,
     messages,
-    ...input.tools === undefined ? {} : { tools: [...input.tools] },
+    ...input.tools === undefined || config.summarizationTools === false ? {} : { tools: [...input.tools] },
+    ...config.summarizationReasoningEffort === undefined ? {} : { reasoningEffort: ReasoningEffortId(config.summarizationReasoningEffort) },
     maxTokens: config.maxTokens,
     sessionId: agent.session.id,
     purpose: 'compaction',
     ...signal === undefined ? {} : { signal },
   }
-  for await (const chunk of ctx.llm.stream(options)) assembler.push(chunk)
+  const call = await ctx.llm.prepareCall({
+    provider: options.provider, model: options.model, maxTokens: config.maxTokens,
+    ...options.reasoningEffort === undefined ? {} : { reasoningEffort: options.reasoningEffort },
+  }, signal)
+  const resolvedOptions = { ...options, ...call.config }
+  const { signal: _signal, ...recordedRequest } = resolvedOptions
+  agent.session.append('compaction/request', { request: recordedRequest })
+  const inspection = await call.inspect?.(resolvedOptions)
+  if (inspection && inspection.maxOutputTokens < config.maxTokens) {
+    throw new LlmError('The summary input cannot fit its reserved output budget', 'CONTEXT_WINDOW_EXCEEDED')
+  }
+  const stream = call.inspect ? call.stream(resolvedOptions) : ctx.llm.stream(options)
+  for await (const chunk of stream) assembler.push(chunk)
   const error = finishError(assembler.finish)
   if (error !== undefined) throw error
 
   const rawOutput = assembler.blocks()
+  if (rawOutput.some(block => block.type === 'tool-call')) throw new Error('summarization attempted a tool call')
   const summary = summaryText(rawOutput)
-  if (!summary.some(block => block.text.trim().length > 0)) {
+  if (!summary.some(block => /[\p{L}\p{N}]/u.test(block.text))) {
     throw new Error('summarization produced no text summary content')
   }
   return {

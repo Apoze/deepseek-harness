@@ -143,6 +143,10 @@ const handle = await ctx.agents.create({
 -----
 
 <a id="model-experience"></a>
+## 生成准入与恢复
+
+已准备的适配器可以在发送前统计完整请求。循环记录 `llm/request-inspected`，然后等待 `agent/request-prepared`；重试会从当前持久化上下文重建请求，并在计数前从保留的组装结果重新投影缺失的运行时上下文，不重复用户消息准入。达到输出上限或返回 `invalid_model_output` 的生成先保存为 `assistant/attempt`，再进入 `agent/response-incomplete`。恢复决策及可选的插件上下文在下一次尝试前提交。被拒绝批次中的工具不会执行。未恢复的限制仍然返回 `max-tokens`，即使后续监听器强制进入下一步。
+
 ## 模型体验
 
 ### 完整对话请求

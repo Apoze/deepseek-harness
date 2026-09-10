@@ -78,6 +78,8 @@ Misconfiguration fails fast: an unknown setting, a duplicate per-model override,
 
 ### What happens when condensation runs
 
+Summaries containing only whitespace or punctuation fail before history replacement. If no balanced range satisfies recent-history retention, compaction leaves history intact rather than discarding retention to make a range fit.
+
 The oldest balanced span is replaced by one summary message and the recent tail stays verbatim; the conversation continues from the summary. The operation reports how many history items were condensed and the estimated tokens freed. If nothing can be condensed safely — for example the whole conversation is one indivisible unit — nothing changes and nothing is written to the session log. If no model is available to write the summary (no configured target and no routed request yet), condensation fails with a clear error telling you to configure the summarization provider and model or route one request.
 
 ### On-demand condensation with /compact
@@ -155,6 +157,10 @@ Read these pages when the package-level contract is not enough; they move from t
 -----
 
 <a id="model-experience"></a>
+## Prepared admission and summary capacity
+
+`admission: prepared` delegates automatic pressure admission to the final request hook. `targetRatio` chooses a recent balanced tail from the desired total occupancy, subtracting fixed input and the summary cap; the final exact count remains authoritative. `summarizationReasoningEffort` and `summarizationTools` configure the auxiliary call independently. Its resolved input is recorded in `compaction/request`. Empty, truncated, image or tool-bearing summaries are rejected before replacement. An oversized auxiliary input retries a strictly smaller balanced prefix, bounded by `compactionRetries`; indivisible input fails explicitly.
+
 ## Model Experience
 
 ### Conversation history

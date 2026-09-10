@@ -64,11 +64,21 @@ const tokenUsageStateSchema = z.object({
 
 type TokenUsageState = z.infer<typeof tokenUsageStateSchema>
 
+const budgetSchema = z.object({
+  inputTokens: z.number().int().nonnegative(),
+  contextWindow: z.number().int().positive(),
+  outputTokens: z.number().int(),
+  workReserve: z.number().int().nonnegative(),
+  safetyMargin: z.number().int().nonnegative(),
+}).strict()
+
 const pressureSchema: z.ZodType<ContextPressureProjection> = z.object({
   pressureTokens: z.number().int().nonnegative().optional(),
   projectedTokens: z.number().int().nonnegative().optional(),
+  preparedBudget: budgetSchema.optional(),
   contextWindow: z.number().int().positive().optional(),
-}).strict().transform(({ pressureTokens, projectedTokens, contextWindow }) => ({
+}).strict().transform(({ pressureTokens, projectedTokens, contextWindow, preparedBudget }) => ({
+  ...preparedBudget === undefined ? {} : { preparedBudget },
   ...pressureTokens === undefined ? {} : { pressureTokens },
   ...projectedTokens === undefined ? {} : { projectedTokens },
   ...contextWindow === undefined ? {} : { contextWindow },
@@ -96,6 +106,7 @@ declare module '@deepseek-ai/dsh-session-projection/types' {
 const contextPressureStateSchema = z.object({
   contextWindow: z.number().int().positive().optional(),
   pressureTokens: z.number().int().nonnegative().optional(),
+  preparedBudget: budgetSchema.optional(),
   surfaceTokens: z.number().int().nonnegative(),
   sampledSurfaceTokens: z.number().int().nonnegative().optional(),
   claim: z.object({
@@ -116,11 +127,11 @@ type ContextPressureState = z.infer<typeof contextPressureStateSchema>
  */
 export const tokenUsageProjectionDefinition = {
   key: 'tokenUsage',
-  stateVersion: 2,
+  stateVersion: 3,
   stateSchema: tokenUsageStateSchema,
   init: () => ({ totals: zeroBuckets(), last: null }),
   apply: (state, event) => {
-    if (event.type === 'llm/retry-started') {
+    if (event.type === 'llm/retry-started' || event.type === 'agent/generation-recovery') {
       return state.last?.turn === event.data.turn && state.last.step === event.data.step
         ? { ...state, last: null }
         : state
@@ -172,7 +183,7 @@ export const tokenUsageProjectionDefinition = {
  */
 export const contextPressureProjectionDefinition = {
   key: 'contextPressure',
-  stateVersion: 4,
+  stateVersion: 5,
   stateSchema: contextPressureStateSchema,
   init: () => ({ surfaceTokens: 0 }),
   apply: (state, event) => {
@@ -189,12 +200,26 @@ export const contextPressureProjectionDefinition = {
         }
       }
     }
+    if (event.type === 'llm/request-inspected') {
+      const value = event.data.inspection
+      next = {
+        ...next, contextWindow: value.contextWindow, pressureTokens: value.inputTokens, sampledSurfaceTokens: next.surfaceTokens,
+        preparedBudget: {
+          inputTokens: value.inputTokens, contextWindow: value.contextWindow, outputTokens: value.maxOutputTokens,
+          workReserve: value.thinkingTokens + value.thinkingClosureTokens + value.contentReserve, safetyMargin: value.safetyMargin,
+        },
+      }
+    }
     const usage = usageOf(event)
     if (usage !== undefined) {
       const pressureTokens = pressureFrom(usage)
       if (pressureTokens !== next.pressureTokens || next.sampledSurfaceTokens !== next.surfaceTokens) {
         next = { ...next, pressureTokens, sampledSurfaceTokens: next.surfaceTokens }
       }
+    }
+    if (event.type === 'request/header' || fold.deltaTokens !== 0) {
+      const { preparedBudget: _stale, ...fresh } = next
+      next = fresh
     }
     if (fold.deltaTokens !== 0) {
       next = { ...next, surfaceTokens: next.surfaceTokens + fold.deltaTokens }
@@ -207,7 +232,8 @@ export const contextPressureProjectionDefinition = {
   },
   wire: {
     viewSchema: pressureSchema,
-    view: ({ contextWindow, pressureTokens, surfaceTokens, sampledSurfaceTokens }) => ({
+    view: ({ contextWindow, pressureTokens, surfaceTokens, sampledSurfaceTokens, preparedBudget }) => ({
+      ...preparedBudget === undefined ? {} : { preparedBudget },
       ...contextWindow === undefined ? {} : { contextWindow },
       ...pressureTokens === undefined ? {} : { pressureTokens },
       ...pressureTokens === undefined || sampledSurfaceTokens === undefined

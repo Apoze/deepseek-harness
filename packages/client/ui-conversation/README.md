@@ -101,6 +101,10 @@ try {
 The selector must be a pure function of the owner currency. Its non-null return is delivered to the component as `matched`; `PropsRuntime<'conversation.composer'>` supplies the standard Session and global props. Chain order remains ascending `priority`, then registration order, and the first non-null selector wins. The shell keeps the default composer mounted beneath a takeover. Request state, listeners, response encoding, and any request-specific child slots belong to the business package; they are not carried by `SessionSnapshot` or declared by this core package.
 
 <a id="model-experience"></a>
+## Prepared context display
+
+While an exact preparation remains current, the context panel displays its available output budget, work reserve and safety margin. Occupancy loses the estimate marker only for that exact preparation; the system/tools/messages breakdown remains heuristic. A subsequent surface or route change invalidates the displayed preparation.
+
 ## Model Experience
 
 None, as this package renders browser state and sends user-admitted inputs through Session Controller APIs without constructing model requests.

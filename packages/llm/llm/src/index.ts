@@ -6,6 +6,7 @@
  * @module @deepseek-ai/dsh-llm
  */
 
+import type { LlmRequestInspection } from './types.ts'
 import { Context } from '@deepseek-ai/cordis'
 import { Remote, RemoteError, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
 import { deepFreeze } from '@deepseek-ai/dsh-util-values'
@@ -181,6 +182,12 @@ export interface PreparedLlmCall {
    * @returns the chunk stream, including the `llm/stream` waterfall.
    */
   stream(options: GenerateOptions): AsyncIterable<StreamChunk>
+  /**
+   * Freeze and count the complete provider request without starting generation.
+   * @param options - final request that will subsequently be dispatched unchanged.
+   * @returns exact capacity facts, absent for adapters without native counting.
+   */
+  inspect?(options: GenerateOptions): Promise<LlmRequestInspection>
 }
 
 /** One adapter-owned model-resolution generation bound to its eventual stream call. */
@@ -189,6 +196,12 @@ export interface PreparedAdapterCall {
   readonly model: LlmResolvedModelInfo
   /** Dispatch through that generation without re-reading dynamic connection facts. */
   stream(options: GenerateOptions): AsyncIterable<StreamChunk>
+  /**
+   * Freeze and count the complete provider request without starting generation.
+   * @param options - final request that will subsequently be dispatched unchanged.
+   * @returns exact capacity facts, absent for adapters without native counting.
+   */
+  inspect?(options: GenerateOptions): Promise<LlmRequestInspection>
 }
 
 /**
@@ -930,6 +943,7 @@ export class LlmRuntime extends TypertRemoteService {
         ? { maxTokens: true }
         : {},
     })
+    const inspect = adapterCall.inspect?.bind(adapterCall)
     let dispatched = false
     return Object.freeze({
       config: resolvedConfig,
@@ -940,6 +954,9 @@ export class LlmRuntime extends TypertRemoteService {
         ? {}
         : { inputModalities: Object.freeze([...modelInfo.inputModalities]) },
       ...modelInfo.systemPromptUpdate === undefined ? {} : { systemPromptUpdate: modelInfo.systemPromptUpdate },
+      ...inspect === undefined ? {} : {
+        inspect: (options: GenerateOptions) => inspect(this.projectRequest(options, modelInfo, registration.adapter)),
+      },
       stream: (options: GenerateOptions): AsyncIterable<StreamChunk> => {
         if (dispatched) {
           throw new LlmError('a prepared LLM call can only be dispatched once', 'INVALID_PREPARED_CALL')
@@ -1008,6 +1025,25 @@ export class LlmRuntime extends TypertRemoteService {
    * and iteration failures become one terminal failure chunk. Middleware and
    * downstream consumer failures remain thrown plugin or consumer errors.
    */
+  private projectRequest(options: GenerateOptions, modelInfo: LlmResolvedModelInfo, adapter: LlmAdapter): GenerateOptions {
+    // Files are never dispatched natively: every route receives handle text.
+    let projectedMessages: readonly Message[] = options.messages
+    if (projectedMessages.some(message => contentHasFile(message.content))) {
+      projectedMessages = projectFilesToText(projectedMessages, ref => this.fileReadPath(ref))
+    }
+    if (modelInfo.inputModalities !== undefined
+      && !modelInfo.inputModalities.includes('image')
+      && projectedMessages.some(message => contentHasImage(message.content))) {
+      projectedMessages = projectImagesForTextModel(projectedMessages)
+    }
+    const projectedOptions = projectedMessages === options.messages
+      ? options
+      : Object.isFrozen(options)
+        ? deepFreeze({ ...options, messages: projectedMessages as Message[] })
+        : { ...options, messages: projectedMessages as Message[] }
+    return this.forAdapter(projectedOptions, adapter)
+  }
+
   private async * adapterStream(
     options: GenerateOptions,
     prepared?: PreparedDispatch,
@@ -1040,22 +1076,7 @@ export class LlmRuntime extends TypertRemoteService {
         : Object.isFrozen(options)
           ? deepFreeze({ ...options, ...resolvedConfig })
           : { ...options, ...resolvedConfig }
-      // Files are never dispatched natively: every route receives handle text.
-      let projectedMessages: readonly Message[] = resolvedOptions.messages
-      if (projectedMessages.some(message => contentHasFile(message.content))) {
-        projectedMessages = projectFilesToText(projectedMessages, ref => this.fileReadPath(ref))
-      }
-      if (modelInfo.inputModalities !== undefined
-        && !modelInfo.inputModalities.includes('image')
-        && projectedMessages.some(message => contentHasImage(message.content))) {
-        projectedMessages = projectImagesForTextModel(projectedMessages)
-      }
-      const projectedOptions = projectedMessages === resolvedOptions.messages
-        ? resolvedOptions
-        : Object.isFrozen(resolvedOptions)
-          ? deepFreeze({ ...resolvedOptions, messages: projectedMessages as Message[] })
-          : { ...resolvedOptions, messages: projectedMessages as Message[] }
-      const stream = dispatch(this.forAdapter(projectedOptions, adapter))
+      const stream = dispatch(this.projectRequest(resolvedOptions, modelInfo, adapter))
       iterator = stream[Symbol.asyncIterator]()
     } catch (error: unknown) {
       yield adapterFailureChunk(error, options.signal)

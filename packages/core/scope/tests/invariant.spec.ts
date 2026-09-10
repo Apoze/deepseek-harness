@@ -1,3 +1,4 @@
+import { SessionSeq } from '@deepseek-ai/dsh-session'
 import { freezeMessage, MessageId } from '@deepseek-ai/dsh-llm'
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
@@ -54,6 +55,8 @@ describe('scoped-dispatch invariants', () => {
       'agent/session-start': [{ agent, source: 'startup' }],
       'agent/pre-step': [{ agent, messages: [message], turn: 1, step: 1, signal }, () => Promise.resolve({ kind: 'enter', messages: [message] })],
       'agent/request': [{ agent, turn: 1, step: 1, signal }, () => Promise.resolve(config)],
+      'agent/request-prepared': [{ agent, turn: 1, step: 1, request: { ...config, messages: [] }, inspection: undefined, signal }, () => Promise.resolve(undefined)],
+      'agent/response-incomplete': [{ agent, turn: 1, step: 1, attemptSeq: SessionSeq(1), finish: { kind: 'max-tokens' }, usage: undefined, request: { ...config, messages: [] }, inspection: undefined, signal }, () => Promise.resolve(undefined)],
       'agent/assistant-stream': [{
         agent,
         frame: {

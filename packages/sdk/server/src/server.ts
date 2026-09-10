@@ -12,6 +12,7 @@ import type { Agent, AgentHandle } from '@deepseek-ai/dsh-agent'
 import { admitEncodedImages, type EncodedImageAttachment, type ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import { createUserMessage, ReasoningEffortId, type ContentBlock, type LlmRuntime } from '@deepseek-ai/dsh-llm'
 import { carrierKeyOf, type Scoped } from '@deepseek-ai/dsh-scope'
+import type {} from '@deepseek-ai/dsh-session-persistence'
 import type { SessionId } from '@deepseek-ai/dsh-session'
 import type SubagentRuntime from '@deepseek-ai/dsh-subagent'
 import type { SubagentRunEndInfo } from '@deepseek-ai/dsh-subagent'
@@ -276,16 +277,20 @@ export class HarnessSdkJsonRpcServer {
     // rows in the host plane, so this agent reads them from the global layer. A
     // deployment that configures a roster has to join one here first
     // (@deepseek-ai/dsh-agent-presets README, "Composing a child agent").
-    const handle = await this.ctx.agents.create({
-      sessionId: brandString<SessionId>(sessionId),
-      meta: { cwd: this.cwd },
-      agentOptions: {
-        provider: this.provider,
-        model: this.model,
-        ...this.reasoningEffort === undefined ? {} : { reasoningEffort: this.reasoningEffort },
-        ...this.maxTokens === undefined ? {} : { maxTokens: this.maxTokens },
-      },
-    })
+    const id = brandString<SessionId>(sessionId)
+    const agentOptions = {
+      provider: this.provider,
+      model: this.model,
+      ...this.reasoningEffort === undefined ? {} : { reasoningEffort: this.reasoningEffort },
+      ...this.maxTokens === undefined ? {} : { maxTokens: this.maxTokens },
+    }
+    const stored = await this.ctx.get('sessionPersistence')?.stat(id)
+    if (stored !== undefined && stored.header.cwd !== this.cwd) {
+      throw new Error(`cannot resume SDK session "${sessionId}" from a different workspace`)
+    }
+    const handle = stored === undefined
+      ? await this.ctx.agents.create({ sessionId: id, meta: { cwd: this.cwd }, agentOptions })
+      : await this.ctx.agents.resume({ resumeSessionId: id, agentOptions })
     const rec: SessionRecord = { handle }
     this.sessions.set(sessionId, rec)
     return rec

@@ -455,8 +455,17 @@ export interface BasicCompactionConfig extends CompactionPolicyConfig {
 
 /** Policy fields shared by the default policy and exact model overrides. */
 export interface CompactionPolicyConfig {
+  /** Admission owner: step estimates, or final native counts handled before generation. */
+  admission?: 'step' | 'prepared'
+  /** Explicit reasoning effort for the auxiliary summary only. */
+  summarizationReasoningEffort?: string
+  /** Include the task tool catalog for summary cache reuse. Defaults to true. */
+  summarizationTools?: boolean
+
   /** Compact at this fraction of the model's context window. Defaults to `0.8`. */
   thresholdRatio?: number
+  /** Desired total occupancy after prepared admission, including fixed input. */
+  targetRatio?: number
   /** Recent context retained as a fraction of the model's window. Defaults to `0.16`. */
   retainRatio?: number
   /** Absolute recent-context budget; mutually exclusive with `retainRatio`. */
@@ -482,7 +491,7 @@ export interface ModelCompactPolicyConfig extends CompactionPolicyConfig {
 }
 ```
 
-Source: [`packages/compaction/compaction-basic/src/types.ts:38`](../packages/compaction/compaction-basic/src/types.ts)
+Source: [`packages/compaction/compaction-basic/src/types.ts:47`](../packages/compaction/compaction-basic/src/types.ts)
 
 <a id="deepseek-aidsh-compaction-tool-result-pruner"></a>
 

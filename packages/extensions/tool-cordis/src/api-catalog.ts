@@ -3115,6 +3115,22 @@ export const EVENT_API: readonly EventApiEntry[] = [
     parameters: [{ name: 'payload', description: '.signal - the turn abort signal. Scope-filtered dispatch (`@deepseek-ai/dsh-scope`): agent-scoped listeners receive only that agent.' }],
   },
   {
+    name: 'agent/request-prepared',
+    mode: 'waterfall',
+    signature: '\'agent/request-prepared\'(this: Scoped<Agent>, payload: { agent: Agent; turn: number; step: number; request: GenerateOptions; inspection: LlmRequestInspection | undefined; signal: AbortSignal }, next: () => Promise<RequestErrorAction>): Promise<RequestErrorAction>',
+    summary: 'Inspect the fully assembled, measured request before generation.',
+    description: 'Inspect the fully assembled, measured request before generation. Retry rebuilds it from the log.',
+    parameters: [{ name: 'payload', description: 'agent, request coordinates, immutable request, optional native count, and cancellation.' }, { name: 'next', description: 'delegates admission to the next listener. Scope-filtered dispatch: agent-scoped listeners receive only their owning agent.' }],
+  },
+  {
+    name: 'agent/response-incomplete',
+    mode: 'waterfall',
+    signature: '\'agent/response-incomplete\'(this: Scoped<Agent>, payload: { agent: Agent; turn: number; step: number; attemptSeq: SessionSeq; finish: FinishReason; usage: TokenUsage | undefined; request: GenerateOptions; inspection: LlmRequestInspection | undefined; signal: AbortSignal }, next: () => Promise<IncompleteResponseAction>): Promise<IncompleteResponseAction>',
+    summary: 'Recover a durably rejected generation before executing any tool or closing its step.',
+    description: 'Recover a durably rejected generation before executing any tool or closing its step.',
+    parameters: [{ name: 'payload', description: 'agent, coordinates, settled attempt, original finish, usage, request, and cancellation.' }, { name: 'next', description: 'delegates recovery; undefined preserves the incomplete or error outcome. Scope-filtered dispatch: agent-scoped listeners receive only their owning agent.' }],
+  },
+  {
     name: 'agent/session-start',
     mode: 'emit',
     signature: '\'agent/session-start\'(this: Scoped<Agent>, payload: { agent: Agent; source: SessionStartSource }): void',
@@ -4240,7 +4256,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'FinishReasonMap',
-    declaration: 'export interface FinishReasonMap {\n    \'stop\': {\n        kind: \'stop\';\n    };\n    \'tool-calls\': {\n        kind: \'tool-calls\';\n    };\n    \'max-tokens\': {\n        kind: \'max-tokens\';\n    };\n    \'aborted\': {\n        kind: \'aborted\';\n        failure: LlmFailure;\n    };\n    \'error\': {\n        kind: \'error\';\n        failure: LlmFailure;\n    };\n}',
+    declaration: 'export interface FinishReasonMap {\n    \'stop\': {\n        kind: \'stop\';\n    };\n    \'tool-calls\': {\n        kind: \'tool-calls\';\n    };\n    \'max-tokens\': {\n        kind: \'max-tokens\';\n        diagnostics?: GenerationDiagnostics;\n    };\n    \'aborted\': {\n        kind: \'aborted\';\n        failure: LlmFailure;\n    };\n    \'error\': {\n        kind: \'error\';\n        failure: LlmFailure;\n    };\n}',
   },
   {
     name: 'FsDirEntry',
@@ -4289,6 +4305,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'GenerateOptions',
     declaration: 'export interface GenerateOptions {\n    provider: string;\n    model: string;\n    reasoningEffort?: ReasoningEffortId;\n    messages: Message[];\n    system?: string;\n    tools?: ToolSchema[];\n    temperature?: number;\n    maxTokens?: number;\n    stop?: string[];\n    signal?: AbortSignal;\n    sessionId?: Branded<\'SessionId\'>;\n    purpose?: \'compaction\' | \'session-title\';\n}',
+  },
+  {
+    name: 'GenerationDiagnostics',
+    declaration: 'export interface GenerationDiagnostics {\n    cause: \'output-limit\' | \'context-capacity\';\n    toolStatus: \'absent\' | \'complete\' | \'incomplete\' | \'invalid\';\n    instanceId: string;\n    requestId?: string;\n    fragment?: string;\n    inputTokens: number;\n    effectiveOutputTokens: number;\n}',
   },
   {
     name: 'GenericCallView',
@@ -4365,6 +4385,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'ImageVariantId',
     declaration: 'export type ImageVariantId = Branded<\'ImageVariantId\'>;',
+  },
+  {
+    name: 'IncompleteResponseAction',
+    declaration: 'export type IncompleteResponseAction = {\n    kind: \'retry\';\n    context?: UserMessage;\n} | undefined;',
   },
   {
     name: 'IndexInjection',
@@ -4553,6 +4577,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'LlmReasoningEffortInfo',
     declaration: 'export interface LlmReasoningEffortInfo {\n    id: ReasoningEffortId;\n    name: string;\n    description?: string;\n}',
+  },
+  {
+    name: 'LlmRequestInspection',
+    declaration: 'export interface LlmRequestInspection {\n    readonly instanceId: string;\n    readonly inputTokens: number;\n    readonly contextWindow: number;\n    readonly thinkingTokens: number;\n    readonly thinkingClosureTokens: number;\n    readonly maxOutputTokens: number;\n    readonly contentReserve: number;\n    readonly safetyMargin: number;\n    readonly compactionThreshold: number;\n    readonly hardOutputCap?: number;\n}',
   },
   {
     name: 'LlmResolvedModelInfo',
@@ -4756,7 +4784,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'PreparedAdapterCall',
-    declaration: 'export interface PreparedAdapterCall {\n    readonly model: LlmResolvedModelInfo;\n    stream(options: GenerateOptions): AsyncIterable<StreamChunk>;\n}',
+    declaration: 'export interface PreparedAdapterCall {\n    readonly model: LlmResolvedModelInfo;\n    stream(options: GenerateOptions): AsyncIterable<StreamChunk>;\n    inspect?(options: GenerateOptions): Promise<LlmRequestInspection>;\n}',
   },
   {
     name: 'PreparedDeepSeekLlmApiExtension',
@@ -4768,7 +4796,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'PreparedLlmCall',
-    declaration: 'export interface PreparedLlmCall {\n    readonly config: LlmCallConfig;\n    readonly retryPolicy: ResolvedRetryPolicy;\n    readonly context?: LlmModelContext;\n    readonly inputModalities?: readonly ModelModality[];\n    readonly systemPromptUpdate?: SystemPromptUpdate;\n    readonly adapterDefaults: LlmCallConfigAdapterDefaults;\n    stream(options: GenerateOptions): AsyncIterable<StreamChunk>;\n}',
+    declaration: 'export interface PreparedLlmCall {\n    readonly config: LlmCallConfig;\n    readonly retryPolicy: ResolvedRetryPolicy;\n    readonly context?: LlmModelContext;\n    readonly inputModalities?: readonly ModelModality[];\n    readonly systemPromptUpdate?: SystemPromptUpdate;\n    readonly adapterDefaults: LlmCallConfigAdapterDefaults;\n    stream(options: GenerateOptions): AsyncIterable<StreamChunk>;\n    inspect?(options: GenerateOptions): Promise<LlmRequestInspection>;\n}',
   },
   {
     name: 'PreparedReferencedMessage',
@@ -5104,7 +5132,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'SessionEventMap',
-    declaration: 'export interface SessionEventMap {\n    \'turn/start\': {\n        turn: number;\n    };\n    \'turn/end\': {\n        turn: number;\n        reason: TurnEndReason;\n    };\n    \'step/start\': {\n        turn: number;\n        step: number;\n    };\n    \'step/end\': {\n        turn: number;\n        step: number;\n    };\n    \'user/message\': UserMessage;\n    \'system/message\': {\n        turn: number;\n        step: number;\n        message: SystemMessage;\n    };\n    \'assistant/message\': {\n        turn: number;\n        step: number;\n        message: AssistantMessage;\n        stream: AssistantStreamRecord[];\n        usage?: TokenUsage;\n        interrupted?: true;\n    };\n    \'assistant/attempt\': {\n        turn: number;\n        step: number;\n        stream: AssistantStreamRecord[];\n    };\n    \'tool/call\': {\n        turn: number;\n        step: number;\n        callId: ToolCallId;\n        name: string;\n        arguments: string;\n    };\n    \'tool/result\': {\n        turn: number;\n        step: number;\n        message: ToolResultMessage;\n        error?: {\n            name: string;\n            code: string;\n        };\n        meta?: JsonValue;\n    };\n    \'request/header\': {\n        header: EpochHeader;\n        reason: RequestHeaderReason;\n        startsSeries?: true;\n    };\n    \'request/context\': RequestContext;\n    \'session/end-seed\': {\n        inherited?: true;\n    };\n}',
+    declaration: 'export interface SessionEventMap {\n    \'llm/request-inspected\': {\n        turn: number;\n        step: number;\n        inspection: LlmRequestInspection;\n    };\n    \'agent/generation-recovery\': {\n        turn: number;\n        step: number;\n        attemptSeq: SessionSeq;\n        context?: UserMessage;\n    };\n    \'turn/start\': {\n        turn: number;\n    };\n    \'turn/end\': {\n        turn: number;\n        reason: TurnEndReason;\n    };\n    \'step/start\': {\n        turn: number;\n        step: number;\n    };\n    \'step/end\': {\n        turn: number;\n        step: number;\n    };\n    \'user/message\': UserMessage;\n    \'system/message\': {\n        turn: number;\n        step: number;\n        message: SystemMessage;\n    };\n    \'assistant/message\': {\n        turn: number;\n        step: number;\n        message: AssistantMessage;\n        stream: AssistantStreamRecord[];\n        usage?: TokenUsage;\n        interrupted?: true;\n    };\n    \'assistant/attempt\': {\n        turn: number;\n        step: number;\n        stream: AssistantStreamRecord[];\n    };\n    \'tool/call\': {\n        turn: number;\n        step: number;\n        callId: ToolCallId;\n        name: string;\n        arguments: string;\n    };\n    \'tool/result\': {\n        turn: number;\n        step: number;\n        message: ToolResultMessage;\n        error?: {\n            name: string;\n            code: string;\n        };\n        meta?: JsonValue;\n    };\n    \'request/header\': {\n        header: EpochHeader;\n        reason: RequestHeaderReason;\n     /* …truncated — full shape in source */',
   },
   {
     name: 'SessionEventMetadataFilter',

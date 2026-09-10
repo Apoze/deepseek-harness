@@ -2105,6 +2105,21 @@
       "doc": "packages/client/ui-conversation/README.md",
       "symbol": "ComposerChainProps",
       "source": "packages/client/ui-conversation/src/client/contract/slots.ts"
+    },
+    {
+      "symbol": "LlmRequestInspection",
+      "source": "packages/llm/llm/src/types.ts",
+      "doc": "docs/subsystems/llm-streaming.md"
+    },
+    {
+      "symbol": "GenerationDiagnostics",
+      "source": "packages/llm/llm/src/types.ts",
+      "doc": "docs/subsystems/llm-streaming.md"
+    },
+    {
+      "symbol": "IncompleteResponseAction",
+      "source": "packages/core/agent/src/runtime-types.ts",
+      "doc": "docs/subsystems/core.md"
     }
   ]
 }

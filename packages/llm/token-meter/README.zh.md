@@ -118,6 +118,10 @@ const price = ctx.tokenMeter.estimateMessage(message)
 -----
 
 <a id="model-experience"></a>
+## 精确准备预算与被拒绝的尝试
+
+`contextPressure.preparedBudget` 投影提供当前精确输入、服务器容量、允许输出、工作预留和安全余量。请求配置或活动上下文变化后，该预算失效。被拒绝尝试的输入用量可以更新提示词占用，但其输出不会进入活动上下文。`agent/generation-recovery` 开始新的累计用量样本；轮次总量包括每次生成尝试，且不会重复计算推理 token。
+
 ## 模型体验
 
 间接地，通过 `dsh-compaction-basic` 等消费方；服务本身不添加任何提示词、消息、schema、工具或模型调用。

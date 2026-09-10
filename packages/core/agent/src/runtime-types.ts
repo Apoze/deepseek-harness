@@ -8,7 +8,8 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { Scoped } from '@deepseek-ai/dsh-scope'
 import type {
-  LlmAttemptId, LlmCallConfig, LlmFailure, MessageId, ReasoningEffortId, ResolvedRetryPolicy, StreamChunk,
+  FinishReason, GenerateOptions, LlmRequestInspection, TokenUsage, LlmAttemptId, LlmCallConfig, LlmFailure,
+  MessageId, ReasoningEffortId, ResolvedRetryPolicy, StreamChunk,
 } from '@deepseek-ai/dsh-llm'
 import type { AgentCancelCause, Session, SessionSeq, UserMessage } from '@deepseek-ai/dsh-session'
 export type { AgentCancelCause } from '@deepseek-ai/dsh-session'
@@ -120,6 +121,9 @@ export type PreStepDecision =
 
 /** Action returned by a listener that owns model-request recovery. */
 export type RequestErrorAction = { kind: 'retry' } | undefined
+
+/** Recovery before an incomplete attempt becomes conversation history. */
+export type IncompleteResponseAction = { kind: 'retry'; context?: UserMessage } | undefined
 
 /** Why a session lifecycle began; seeded creates are `startup`, while persisted loads are `resume`. */
 export type SessionStartSource = 'startup' | 'resume' | 'clear' | 'compact'
@@ -361,6 +365,22 @@ declare module '@deepseek-ai/cordis' {
      * @mode waterfall
      */
     'agent/request-error'(this: Scoped<Agent>, payload: { agent: Agent; turn: number; step: number; provider: string; failure: LlmFailure; retryPolicy: ResolvedRetryPolicy | undefined; signal: AbortSignal }, next: () => Promise<RequestErrorAction>): Promise<RequestErrorAction>
+    /**
+     * Inspect the fully assembled, measured request before generation. Retry rebuilds it from the log.
+     * @param payload - agent, request coordinates, immutable request, optional native count, and cancellation.
+     * @param next - delegates admission to the next listener.
+     * Scope-filtered dispatch: agent-scoped listeners receive only their owning agent.
+     * @mode waterfall
+     */
+    'agent/request-prepared'(this: Scoped<Agent>, payload: { agent: Agent; turn: number; step: number; request: GenerateOptions; inspection: LlmRequestInspection | undefined; signal: AbortSignal }, next: () => Promise<RequestErrorAction>): Promise<RequestErrorAction>
+    /**
+     * Recover a durably rejected generation before executing any tool or closing its step.
+     * @param payload - agent, coordinates, settled attempt, original finish, usage, request, and cancellation.
+     * @param next - delegates recovery; undefined preserves the incomplete or error outcome.
+     * Scope-filtered dispatch: agent-scoped listeners receive only their owning agent.
+     * @mode waterfall
+     */
+    'agent/response-incomplete'(this: Scoped<Agent>, payload: { agent: Agent; turn: number; step: number; attemptSeq: SessionSeq; finish: FinishReason; usage: TokenUsage | undefined; request: GenerateOptions; inspection: LlmRequestInspection | undefined; signal: AbortSignal }, next: () => Promise<IncompleteResponseAction>): Promise<IncompleteResponseAction>
     /**
      * Process-local assistant-stream publication. Chunk frames are transient;
      * the loop appends one final v2 `assistant/message` or `assistant/attempt`

@@ -123,6 +123,17 @@ export type ContentBlockType = keyof ContentBlockMap
 /** Any known content block, derived from {@link ContentBlockMap}; switch on `type` and fall through unknowns (merge-extensible). */
 export type ContentBlock = ContentBlockMap[ContentBlockType]
 
+/** Provider evidence for an interrupted model generation, retained with its attempt. */
+export interface GenerationDiagnostics {
+  cause: 'output-limit' | 'context-capacity'
+  toolStatus: 'absent' | 'complete' | 'incomplete' | 'invalid'
+  instanceId: string
+  requestId?: string
+  fragment?: string
+  inputTokens: number
+  effectiveOutputTokens: number
+}
+
 /**
  * Why a model response stopped.
  * Merge-extensible so adapters can surface provider-specific reasons.
@@ -130,7 +141,7 @@ export type ContentBlock = ContentBlockMap[ContentBlockType]
 export interface FinishReasonMap {
   'stop': { kind: 'stop' }
   'tool-calls': { kind: 'tool-calls' }
-  'max-tokens': { kind: 'max-tokens' }
+  'max-tokens': { kind: 'max-tokens'; diagnostics?: GenerationDiagnostics }
   'aborted': { kind: 'aborted'; failure: LlmFailure }
   'error': { kind: 'error'; failure: LlmFailure }
 }
@@ -456,4 +467,18 @@ export interface GenerateOptions {
    * generation policy. Ordinary conversation requests leave it unset.
    */
   purpose?: 'compaction' | 'session-title'
+}
+
+/** Exact adapter-owned input count and the output envelope for that immutable request. */
+export interface LlmRequestInspection {
+  readonly instanceId: string
+  readonly inputTokens: number
+  readonly contextWindow: number
+  readonly thinkingTokens: number
+  readonly thinkingClosureTokens: number
+  readonly maxOutputTokens: number
+  readonly contentReserve: number
+  readonly safetyMargin: number
+  readonly compactionThreshold: number
+  readonly hardOutputCap?: number
 }

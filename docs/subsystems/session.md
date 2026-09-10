@@ -25,6 +25,11 @@ interface UserMessage extends Message {
  * compact raw streams so persistence stores one durable settlement per attempt.
  */
 interface SessionEventMap {
+  /** Exact count and output envelope of a fully prepared provider request. */
+  'llm/request-inspected': { turn: number; step: number; inspection: LlmRequestInspection }
+  /** Recovery decision committed before another model generation is attempted. */
+  'agent/generation-recovery': { turn: number; step: number; attemptSeq: SessionSeq; context?: UserMessage }
+
   /**
    * Opens turn `turn` before the loop claims queued input or runs pre-step.
    * Rejection, empty input, cancellation, or failure may close it with no

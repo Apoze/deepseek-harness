@@ -1144,6 +1144,48 @@ Types: [LlmFailure](llm-streaming.md) · [ResolvedRetryPolicy](llm-streaming.md)
 
 Source: [`packages/core/agent/src/runtime-types.ts`](../../packages/core/agent/src/runtime-types.ts)
 
+<a id="agentrequest-prepared--waterfall"></a>
+
+#### `agent/request-prepared` — waterfall
+
+Inspect the fully assembled, measured request before generation. Retry rebuilds it from the log.
+
+```ts cordis-catalog
+/**
+ * Inspect the fully assembled, measured request before generation. Retry rebuilds it from the log.
+ * @param payload - agent, request coordinates, immutable request, optional native count, and cancellation.
+ * @param next - delegates admission to the next listener.
+ * Scope-filtered dispatch: agent-scoped listeners receive only their owning agent.
+ * @mode waterfall
+ */
+'agent/request-prepared'(this: Scoped<Agent>, payload: { agent: Agent; turn: number; step: number; request: GenerateOptions; inspection: LlmRequestInspection | undefined; signal: AbortSignal }, next: () => Promise<RequestErrorAction>): Promise<RequestErrorAction>
+```
+
+Types: [GenerateOptions](llm-streaming.md) · [LlmRequestInspection](llm-streaming.md) · [Scoped](scope.md)
+
+Source: [`packages/core/agent/src/runtime-types.ts`](../../packages/core/agent/src/runtime-types.ts)
+
+<a id="agentresponse-incomplete--waterfall"></a>
+
+#### `agent/response-incomplete` — waterfall
+
+Recover a durably rejected generation before executing any tool or closing its step.
+
+```ts cordis-catalog
+/**
+ * Recover a durably rejected generation before executing any tool or closing its step.
+ * @param payload - agent, coordinates, settled attempt, original finish, usage, request, and cancellation.
+ * @param next - delegates recovery; undefined preserves the incomplete or error outcome.
+ * Scope-filtered dispatch: agent-scoped listeners receive only their owning agent.
+ * @mode waterfall
+ */
+'agent/response-incomplete'(this: Scoped<Agent>, payload: { agent: Agent; turn: number; step: number; attemptSeq: SessionSeq; finish: FinishReason; usage: TokenUsage | undefined; request: GenerateOptions; inspection: LlmRequestInspection | undefined; signal: AbortSignal }, next: () => Promise<IncompleteResponseAction>): Promise<IncompleteResponseAction>
+```
+
+Types: [FinishReason](llm-streaming.md) · [GenerateOptions](llm-streaming.md) · [LlmRequestInspection](llm-streaming.md) · [Scoped](scope.md) · [SessionSeq](session.md) · [TokenUsage](llm-streaming.md)
+
+Source: [`packages/core/agent/src/runtime-types.ts`](../../packages/core/agent/src/runtime-types.ts)
+
 <a id="agentsession-start--emit"></a>
 
 #### `agent/session-start` — emit
@@ -1270,3 +1312,10 @@ One session committed a different agent preset to its durable log. Consumers inv
 
 Source: [`packages/preset/agent-presets/src/types.ts`](../../packages/preset/agent-presets/src/types.ts)
 <!-- END GENERATED cordis-surface -->
+
+## `IncompleteResponseAction`
+
+```ts type-equiv
+/** Recovery before an incomplete attempt becomes conversation history. */
+type IncompleteResponseAction = { kind: 'retry'; context?: UserMessage } | undefined
+```

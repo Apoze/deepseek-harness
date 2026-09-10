@@ -1091,6 +1091,39 @@ describe('HarnessSdkJsonRpcServer', () => {
     }
   })
 
+  it('resumes persisted SDK history after runtime disposal and refuses a different workspace', async () => {
+    const storageDir = await mkdtemp(join(tmpdir(), 'dsh-sdk-resume-'))
+    const llmServer = await mockCompletionServer()
+    vi.stubEnv('DEEPSEEK_API_KEY', 'test-key')
+    vi.stubEnv('DEEPSEEK_BASE_URL', llmServer.url)
+    const first = await makeHarness(storageDir)
+    try {
+      const handle = await first.agents.create({ sessionId: SessionId('remembered'), meta: { cwd: storageDir } })
+      handle.agent.session.append('user/message', createUserMessage({ content: [{ type: 'text', text: 'Remember ORCHIDEE.' }], source: { kind: 'user' } }), { surfaceOp: 'append' })
+      await handle.dispose()
+    } finally { await first.fiber.dispose() }
+    const second = await makeHarness(storageDir)
+    try {
+      const server = new HarnessSdkJsonRpcServer(second, new FakeTransport())
+      await server.handleRequest('initialize', { cwd: storageDir, provider: 'deepseek-official', model: 'dsagent-model' })
+      await server.handleRequest('session/prompt', { sessionId: 'remembered', contentBlocks: [{ type: 'text', text: 'What did I ask you to remember?' }] })
+      const resumed = second.agents.get(SessionId('remembered'))
+      if (resumed === undefined) throw new Error('resumed agent is missing')
+      await resumed.whenIdle()
+      const body = llmServer.requests[0] as { messages: { content: unknown }[] }
+      expect(body.messages.some(message => message.content === 'Remember ORCHIDEE.')).toBe(true)
+      await server.shutdown()
+      const otherWorkspace = new HarnessSdkJsonRpcServer(second, new FakeTransport())
+      await otherWorkspace.handleRequest('initialize', { cwd: join(storageDir, 'other'), provider: 'deepseek-official', model: 'dsagent-model' })
+      await expect(otherWorkspace.handleRequest('session/prompt', { sessionId: 'remembered', contentBlocks: [{ type: 'text', text: 'Do not run.' }] })).rejects.toThrow('different workspace')
+      expect(llmServer.requests).toHaveLength(1)
+      await otherWorkspace.shutdown()
+    } finally {
+      await second.fiber.dispose()
+      await rm(storageDir, { recursive: true, force: true })
+    }
+  })
+
   it('coalesces concurrent session creation and retries a failed creation', async () => {
     let resolveShared: ((handle: AgentHandle) => void) | undefined
     const sharedCreation = new Promise<AgentHandle>((resolve) => { resolveShared = resolve })
@@ -1112,7 +1145,7 @@ describe('HarnessSdkJsonRpcServer', () => {
 
     const first = server.getOrCreateSession('shared')
     const second = server.getOrCreateSession('shared')
-    expect(create).toHaveBeenCalledTimes(1)
+    await vi.waitFor(() => { expect(create).toHaveBeenCalledTimes(1) })
     resolveShared?.(sharedHandle)
     const [firstRecord, secondRecord] = await Promise.all([first, second])
     expect(firstRecord).toBe(secondRecord)
@@ -1134,7 +1167,7 @@ describe('HarnessSdkJsonRpcServer', () => {
     const ctx = {
       on: vi.fn(() => () => undefined),
       agents: { create, get: () => undefined },
-      get: () => ({ listProviders: () => [{ id: 'mock', name: 'Mock' }], resolveCallConfig }),
+      get: (name: string) => name === 'llm' ? { listProviders: () => [{ id: 'mock', name: 'Mock' }], resolveCallConfig } : undefined,
     } as unknown as Context
     const server = new HarnessSdkJsonRpcServer(ctx, new FakeTransport()) as unknown as {
       initialize(params: { cwd: string; provider: string; model: string; reasoningEffort?: string; maxTokens?: number }): Promise<unknown>

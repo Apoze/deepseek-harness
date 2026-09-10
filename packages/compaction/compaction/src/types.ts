@@ -1,3 +1,4 @@
+import type { GenerateOptions } from '@deepseek-ai/dsh-llm/types'
 /**
  * Compaction vocabulary: the result type and the `compaction/*` session events.
  * Those declaration-merged events record the lock and summary inputs without entering the surface, so they are not
@@ -16,6 +17,8 @@ export type { CompactionId }
 
 declare module '@deepseek-ai/dsh-session/types' {
   interface SessionEventMap {
+    /** Exact auxiliary summary input, recorded before counting or generation. */
+    'compaction/request': { request: Omit<GenerateOptions, 'signal'> }
     /**
      * Marks the start of a compaction — log-only, holds the lock until
      * `compaction/end`. A numbered owner is strictly enclosed by that open turn;

@@ -92,9 +92,11 @@ turn/start
      reconcile system/message using the prepared call capability
      append entered messages as user/message; log request/header and request/context as needed
      derive and freeze model history from the log
+     inspect prepared request -> llm/request-inspected -> agent/request-prepared
      stream the bound prepared call -> llm/stream -> agent/assistant-stream start
        agent/assistant-stream chunk*
        assistant/message | assistant/attempt -> agent/assistant-stream end
+     rejected generation -> agent/response-incomplete -> agent/generation-recovery -> rebuild current step
      tool/call* -> tools/pre-execute -> tools/execute -> tools/post-execute -> tool/result*
      step/end
      tools owe another request, or next-step input arrived -> claim -> next step
@@ -116,7 +118,7 @@ Details: the [sequence diagram](agent-lifecycle.md), the [tool pipeline](tool-ex
 
 The session log is the source of the context the model sees. `deriveMessages()` projects model history from it. Each `assistant/message` embeds the exact compact timed stream that produced its assembled content; `assistant/attempt` retains settled failed, retried, cancelled, and stream-error attempts without adding model history. Fork, resume, transcripts, telemetry, and persistence all derive from these durable settlements, while live UI incrementality comes from `agent/assistant-stream`; a hard process loss before settlement leaves no durable attempt stream ([decision](../.agents/notes/implemented/architecture/2026-09-01-v2-embedded-assistant-streams.md)).
 
-Session consumers know only the current logical format. Header-only `stat` and `list` rescan each Session directory, select its numerically highest canonical generation, and translate a supported historical header without loading events or publishing a successor. A stored-session `open` selects that same generation, refuses a future version, or decodes and composes the static adjacent migration chain once before returning validated current logical events. A read open uses that in-memory result without publishing a successor; a write open first encodes, verifies, and exclusively publishes the final version-named successor beside the unchanged source. Ordinary repair of an unsealed interrupted tail remains a handle consumer responsibility; migration inserts a missing interrupted `turn/end` only for the bounded released restart already sealed by a later `turn/start`. JSONL v0 uses `session.jsonl[.zstd]`, v1 and later use lowercase `session.vN.jsonl[.zstd]`, and committed generation paths are never renamed, replaced, or deleted. The JSONL provider owns physical framing, compression, generation selection, and exclusive publication, while each adjacent migration package owns exactly one `vN -> vN+1` step ([decision](../.agents/notes/implemented/architecture/2026-08-31-released-session-format-migrations.md)).
+Session consumers use the current logical format. Persistence selects the highest canonical generation; header reads translate metadata without publishing files. Opening a supported historical log composes adjacent migrations in memory. A write open verifies and publishes a version-named successor beside the unchanged source. Future formats are refused. The JSONL provider owns framing, compression, selection, and publication; adjacent migration packages own each version transition ([session format](session-format-status.md), [decision](../.agents/notes/implemented/architecture/2026-08-31-released-session-format-migrations.md)).
 
 **Model-visible means logged.** Anything that reaches a model request must be reconstructable from the log, and a runtime invariant asserts it. This is why a new model-visible input requires a new session event: extend `SessionEventMap` and render from the log.
 
@@ -158,3 +160,7 @@ New behavior attaches to a documented extension point. Changing the loop itself 
 | Scope a registration to one agent | use that agent's `agent.ctx` |
 
 The [extension cookbook](cookbook/extension-cookbook.md) maps features to capabilities and indexes the step-by-step guides for [packages](cookbook/adding-a-package.md), [tools](cookbook/adding-a-tool.md), [LLM adapters](cookbook/adding-an-llm-adapter.md), and [settings cards](cookbook/adding-a-settings-card.md). The [Conversation subsystem](subsystems/conversation.md) owns Chat-node assembly.
+
+## Prepared admission and generation recovery
+
+The final preparation hook admits the complete counted request. Incomplete generations settle as log-only attempts before recovery; only accepted responses reach tool execution. Recovery policies live in plugins, and every retry rebuilds the current step from its durable surface and restores runtime context removed by compaction before counting.

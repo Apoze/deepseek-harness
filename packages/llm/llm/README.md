@@ -135,6 +135,10 @@ Read these pages when the package-level contract is not enough. They move from t
 -----
 
 <a id="model-experience"></a>
+## Prepared request inspection
+
+`PreparedLlmCall.inspect` is optional. It measures the same projected message content and attachment references dispatched by that prepared call; adapters own exact wire counting and server identity. Core LLM preparation centralizes file/image projection for inspection and streaming. Inspection does not invoke a tool or count generated output. Explicit output caps remain limits, while adapter-owned defaults are recorded separately.
+
 ## Model Experience
 
 None, as the LLM service adds no content; adapters choose when to add the shared image descriptors and per-image placeholders exported by this package.

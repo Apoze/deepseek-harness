@@ -116,6 +116,10 @@ Read these pages when the package-level contract is not enough. They move from t
 -----
 
 <a id="model-experience"></a>
+## Exact prepared budgets and rejected attempts
+
+The `contextPressure.preparedBudget` projection exposes the current exact input, server capacity, allowed output, work reserve and safety margin. It expires when the request envelope or active surface changes. Input usage from rejected attempts can refresh prompt occupancy, but their output never joins the active surface. `agent/generation-recovery` starts a new cumulative usage sample; turn totals include every attempted generation without counting reasoning twice.
+
 ## Model Experience
 
 Indirectly, through consumers such as `dsh-compaction-basic`; the service itself adds no prompt, message, schema, tool, or model call.

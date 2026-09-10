@@ -31,12 +31,12 @@ describe('ACP prompt lifecycle', () => {
     harness = undefined
   })
 
-  it('reports a max-token turn without losing its committed text', async () => {
+  it('reports a max-token turn without publishing the rejected attempt as committed text', async () => {
     harness = await makeBridgeHarness({ script: [maxTokensResponse('cut off')] })
     const sessionId = await newSession(harness)
     const result = await harness.client.prompt({ sessionId, prompt: [{ type: 'text', text: 'go' }] })
     expect(result.stopReason).toBe('max_tokens')
-    await vi.waitFor(() => { expect(messageText(harness!)).toBe('cut off') })
+    expect(messageText(harness)).toBe('')
   })
 
   it('delivers a committed assistant image as verified ACP base64', async () => {

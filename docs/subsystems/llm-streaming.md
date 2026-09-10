@@ -624,7 +624,7 @@ Why a model response stopped is a merge-extensible reason. Terminal provider fai
 interface FinishReasonMap {
   'stop': { kind: 'stop' }
   'tool-calls': { kind: 'tool-calls' }
-  'max-tokens': { kind: 'max-tokens' }
+  'max-tokens': { kind: 'max-tokens'; diagnostics?: GenerationDiagnostics }
   'aborted': { kind: 'aborted'; failure: LlmFailure }
   'error': { kind: 'error'; failure: LlmFailure }
 }
@@ -770,6 +770,12 @@ interface PreparedLlmCall {
    * @returns the chunk stream, including the `llm/stream` waterfall.
    */
   stream(options: GenerateOptions): AsyncIterable<StreamChunk>
+  /**
+   * Freeze and count the complete provider request without starting generation.
+   * @param options - final request that will subsequently be dispatched unchanged.
+   * @returns exact capacity facts, absent for adapters without native counting.
+   */
+  inspect?(options: GenerateOptions): Promise<LlmRequestInspection>
 }
 ```
 
@@ -1088,3 +1094,36 @@ Waterfall around every streaming model call (retry, replay, routing). Bound to t
 
 Source: [`packages/llm/llm/src/index.ts`](../../packages/llm/llm/src/index.ts)
 <!-- END GENERATED cordis-surface -->
+
+## `LlmRequestInspection`
+
+```ts type-equiv
+/** Exact adapter-owned input count and the output envelope for that immutable request. */
+interface LlmRequestInspection {
+  readonly instanceId: string
+  readonly inputTokens: number
+  readonly contextWindow: number
+  readonly thinkingTokens: number
+  readonly thinkingClosureTokens: number
+  readonly maxOutputTokens: number
+  readonly contentReserve: number
+  readonly safetyMargin: number
+  readonly compactionThreshold: number
+  readonly hardOutputCap?: number
+}
+```
+
+## `GenerationDiagnostics`
+
+```ts type-equiv
+/** Provider evidence for an interrupted model generation, retained with its attempt. */
+interface GenerationDiagnostics {
+  cause: 'output-limit' | 'context-capacity'
+  toolStatus: 'absent' | 'complete' | 'incomplete' | 'invalid'
+  instanceId: string
+  requestId?: string
+  fragment?: string
+  inputTokens: number
+  effectiveOutputTokens: number
+}
+```

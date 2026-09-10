@@ -129,6 +129,10 @@ session.deriveMessages()         // the derived model history
 -----
 
 <a id="model-experience"></a>
+## 生成准备记录
+
+`llm/request-inspected` 和 `agent/generation-recovery` 是不改变活动上下文的持久化步骤记录。被拒绝的提供方流保存在 `assistant/attempt` 中；技术恢复指令以注明来源的 `user/message` 进入上下文。这些事件需要能够识别它们的读取器。回滚使用保留的旧会话版本或备份，而不是要求旧读取器忽略必需事件。
+
 ## 模型体验
 
 ### 派生消息历史

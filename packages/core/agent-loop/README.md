@@ -143,6 +143,10 @@ The package-level contract is enough for most consumers; read these when you nee
 -----
 
 <a id="model-experience"></a>
+## Generation admission and recovery
+
+A prepared adapter can count the complete request before dispatch. The loop records `llm/request-inspected`, then awaits `agent/request-prepared`; a retry rebuilds from the current durable surface and reprojects missing runtime context from the retained assembly before counting, without repeating user admission. A limited generation or `invalid_model_output` settles as `assistant/attempt` before `agent/response-incomplete`. A recovery decision and its optional plugin context are committed before another attempt. No tool from a rejected batch executes. An unresolved limit remains `max-tokens`, including when a later turn-stopping listener forces another step.
+
 ## Model Experience
 
 ### Complete conversation request

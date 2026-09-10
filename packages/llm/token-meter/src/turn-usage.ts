@@ -223,6 +223,11 @@ export function deriveTurnTokenUsage(events: readonly SessionEvent[]): TurnToken
       else state = { kind: 'open', turn, step: event.data.step }
       continue
     }
+    if (event.type === 'agent/generation-recovery') {
+      if (state.kind !== 'finishClosed' || !sameAttempt(state, event.data.turn, event.data.step)) invalid = true
+      else state = { kind: 'open', turn, step: event.data.step }
+      continue
+    }
     if (event.type === 'assistant/attempt') {
       if (event.data.turn !== turn
         || state.kind !== 'open'

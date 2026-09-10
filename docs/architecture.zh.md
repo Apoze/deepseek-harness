@@ -96,9 +96,11 @@ turn/start
      reconcile system/message using the prepared call capability
      append entered messages as user/message; log request/header and request/context as needed
      derive and freeze model history from the log
+     inspect prepared request -> llm/request-inspected -> agent/request-prepared
      stream the bound prepared call -> llm/stream -> agent/assistant-stream start
        agent/assistant-stream chunk*
        assistant/message | assistant/attempt -> agent/assistant-stream end
+     rejected generation -> agent/response-incomplete -> agent/generation-recovery -> rebuild current step
      tool/call* -> tools/pre-execute -> tools/execute -> tools/post-execute -> tool/result*
      step/end
      tools owe another request, or next-step input arrived -> claim -> next step
@@ -120,7 +122,7 @@ turn/end
 
 会话日志是模型所见上下文的来源。`deriveMessages()` 从中投影出模型历史。每个 `assistant/message` 都嵌入产生其组装内容的精确紧凑带时间 stream；`assistant/attempt` 保留已到达 settlement 的失败、重试、取消与 stream error attempt，且不添加模型历史。fork、恢复、transcript（文本记录）、遥测与持久化都从这些持久 settlement 派生，实时 UI 增量则来自 `agent/assistant-stream`；如果进程在 settlement 前硬中断，则不会留下持久 attempt stream（见[决策](../.agents/notes/implemented/architecture/2026-09-01-v2-embedded-assistant-streams.zh.md)）。
 
-Session 消费方只了解当前逻辑格式。仅 header 的 `stat` 与 `list` 会重新扫描每个 Session 目录，选择数值最高的规范 generation，并在不加载事件或发布后继的情况下转换受支持的历史 header。已存储 Session 的 `open` 选择同一 generation，拒绝未来版本，或只 Decode 并组合一次构建时静态确定的相邻迁移链，再返回经过校验的当前逻辑事件。只读 open 直接使用这份内存结果，不发布后继；写 open 则先编码、校验并在未改变源的旁边排他发布最终版本命名的后继。未被后续事件封住的普通中断尾部仍由句柄消费方修复；只有在后续 `turn/start` 已经封住一种有限的已发布 restart 时，migration 才会插入缺失的 interrupted `turn/end`。JSONL v0 使用 `session.jsonl[.zstd]`，v1 及后续版本使用小写 `session.vN.jsonl[.zstd]`；已提交 generation 路径绝不重命名、替换或删除。JSONL provider 负责物理 framing、压缩、generation 选择与排他发布，每个相邻迁移包只负责一个 `vN -> vN+1` 步骤（[决策](../.agents/notes/implemented/architecture/2026-08-31-released-session-format-migrations.zh.md)）。
+Session 消费方使用当前逻辑格式。持久化选择最高的规范 generation；读取 header 只转换元数据，不发布文件。打开受支持的历史日志时，相邻迁移在内存中组合。写入 open 校验并在未改变源的旁边发布按版本命名的后继。未来格式会被拒绝。JSONL provider 负责 framing、压缩、选择和发布；相邻迁移包负责各版本转换（[Session 格式](session-format-status.zh.md)、[决策](../.agents/notes/implemented/architecture/2026-08-31-released-session-format-migrations.zh.md)）。
 
 **模型可见即已记录。** 抵达模型请求的一切都必须能从日志重建，并由一项运行时不变量断言这一点。因此，新增一项模型可见输入就需要新增一个会话事件：扩展 `SessionEventMap` 并从日志渲染。
 
@@ -162,3 +164,7 @@ seam 正是替换一个提供方就能改变整个产品的原因。文件系统
 | 将注册项限定到单个 agent | 使用该 agent 的 `agent.ctx` |
 
 [扩展实操手册](cookbook/extension-cookbook.zh.md)将功能映射到能力，并索引[包](cookbook/adding-a-package.zh.md)、[工具](cookbook/adding-a-tool.zh.md)、[LLM（大语言模型）适配器](cookbook/adding-an-llm-adapter.zh.md)和[设置卡片](cookbook/adding-a-settings-card.zh.md)的分步指南。[Conversation 子系统](subsystems/conversation.zh.md)负责 Chat node 组装。
+
+## 准备阶段准入与生成恢复
+
+最终准备钩子通过 `llm/request-inspected` 记录完整请求的计数，再由 `agent/request-prepared` 执行准入。未完成的生成先保存为仅日志可见的尝试，然后进入 `agent/response-incomplete`；恢复决策记录为 `agent/generation-recovery`。只有被接受的响应才会执行工具。恢复策略由插件提供，每次重试从持久化上下文重建当前步骤，并在计数前恢复被压缩移除的运行时上下文。
