@@ -9,6 +9,7 @@ import z from '@deepseek-ai/schemastery'
 import { CompactionEngine, ManualCompactionError } from '@deepseek-ai/dsh-compaction'
 import type { CompactionResult, CompactionTrigger } from '@deepseek-ai/dsh-compaction'
 import type { Session, SessionSeq } from '@deepseek-ai/dsh-session'
+import type {} from '@deepseek-ai/dsh-session-projection'
 import { CONTEXT_WINDOW_EXCEEDED_CODE } from '@deepseek-ai/dsh-llm'
 import type { LlmCallConfig } from '@deepseek-ai/dsh-llm'
 import { assertNever } from '@deepseek-ai/dsh-util-values'
@@ -303,7 +304,7 @@ export class BasicCompactionEngine extends CompactionEngine {
 
     if (trigger === 'context-overflow') {
       const budget = policy.admission === 'prepared'
-        ? this.ctx.sessionProjections.stateOf(agent.session, 'contextPressure')?.preparedBudget
+        ? this.ctx.sessionProjections.snapshot(agent.session, ['contextPressure']).values.contextPressure?.preparedBudget
         : undefined
       if (prune !== undefined) {
         prune.pruneSession(agent.session)
