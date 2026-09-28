@@ -259,3 +259,7 @@ Rules:
 - **规范错误之外的溢出恢复，尚未决定**——恢复仅针对 `CONTEXT_WINDOW_EXCEEDED` 触发；其他提供方侧上下文失败不参与分类。
 
 </details>
+
+## 预备准入与摘要容量
+
+`admission: prepared` 将压力准入交给最终请求钩子。`targetRatio` 根据目标总占用量保留最近的平衡尾部，同时计入固定输入和摘要容量。`summarizationReasoningEffort` 与 `summarizationTools` 独立配置辅助调用，其解析后的输入记录在 `compaction/request` 中。空摘要、截断摘要或包含工具调用的摘要在替换前被拒绝。辅助输入过大时，按 `compactionRetries` 限定次数重试更小的平衡前缀；无法拆分的输入明确失败。

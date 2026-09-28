@@ -679,7 +679,7 @@ export type ThemePreference = typeof THEME_PREFERENCES[number]
 ## `@deepseek-ai/dsh-compaction-basic`
 
 - `inject`: `llm` · `tokenMeter` · `sessions`
-- `source`: [`packages/compaction/compaction-basic/src/types.ts:40`](../packages/compaction/compaction-basic/src/types.ts)
+- `source`: [`packages/compaction/compaction-basic/src/types.ts:49`](../packages/compaction/compaction-basic/src/types.ts)
 
 ```ts config-catalog
 /** Basic compaction configuration with an optional exact-target policy table. */
@@ -692,6 +692,15 @@ export interface BasicCompactionConfig extends CompactionPolicyConfig {
 
 /** Policy fields shared by the default policy and exact model overrides. */
 export interface CompactionPolicyConfig {
+  /** Admission owner: step estimates, or final native counts handled before generation. */
+  admission?: 'step' | 'prepared'
+  /** Explicit reasoning effort for the auxiliary summary only. */
+  summarizationReasoningEffort?: string
+  /** Include the task tool catalog for summary cache reuse. Defaults to true. */
+  summarizationTools?: boolean
+
+  /** Desired total occupancy after prepared admission, including fixed input. */
+  targetRatio?: number
   /** Window fraction for pressure; capped at context window minus reserved output and `headroomTokens`. Defaults to `0.8`. */
   thresholdRatio?: number
   /** Additional pressure headroom beyond the routed output reservation. Non-negative integer; defaults to `65536`. */

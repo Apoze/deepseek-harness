@@ -358,6 +358,31 @@ function appendAssistant(
   }, { surfaceOp: 'append' }).seq
 }
 
+describe('native generation accounting', () => {
+  it('adds recovered attempt cost while keeping its output off the active context', async () => {
+    const { ctx, session } = await harness()
+    startStep(session, 1, 1)
+    const attemptSeq = usageChunk(session, { inputTokens: 100, outputTokens: 40, reasoningTokens: 20 }, 1, 1)
+    session.append('agent/generation-recovery', { turn: 1, step: 1, attemptSeq })
+    finalUsage(session, { inputTokens: 110, outputTokens: 5, reasoningTokens: 2 }, 1, 1)
+    expect(projected(ctx, session)).toMatchObject({ uncachedInputTokens: 210, outputTokens: 45 })
+    expect(pressure(ctx, session).pressureTokens).toBe(110)
+  })
+  it('publishes a counted budget and expires it when the surface changes', async () => {
+    const { ctx, session } = await harness()
+    session.append('llm/request-inspected', { turn: 1, step: 1, inspection: {
+      instanceId: 'counted', inputTokens: 90_000, contextWindow: 150_000,
+      thinkingTokens: 32_768, thinkingClosureTokens: 4, contentReserve: 16_384,
+      maxOutputTokens: 55_904, safetyMargin: 4096, compactionThreshold: .7,
+    } })
+    expect(pressure(ctx, session)).toMatchObject({
+      pressureTokens: 90_000, contextWindow: 150_000, preparedBudget: { outputTokens: 55_904, workReserve: 49_156 },
+    })
+    session.append('user/message', createMessage({ role: 'user', content: [{ type: 'text', text: 'New input' }], source: { kind: 'user' } }), { surfaceOp: 'append' })
+    expect(pressure(ctx, session).preparedBudget).toBeUndefined()
+  })
+})
+
 describe('contextPressure session projection', () => {
   it('serves no pressure or capacity for an empty log', async () => {
     const { ctx, session } = await harness()

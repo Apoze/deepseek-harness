@@ -19,6 +19,20 @@ function migrate(rows: readonly unknown[]) {
 }
 
 describe('released v0 legacy normalization', () => {
+  it('promotes a version-two one-shot descriptor without inventing continuation state', () => {
+    const rows = [
+      { type: 'turn/start', seq: 0, time: 1, data: { turn: 1 } },
+      { type: 'subagent/descriptor', seq: 1, time: 2, data: { version: 2, mode: 'one-shot', provider: 'spawn' } },
+      { type: 'turn/end', seq: 2, time: 3, data: { turn: 1, reason: { kind: 'completed' } } },
+    ]
+    expect(migrate(rows).events[1]?.data).toEqual({ version: 3, mode: 'one-shot', provider: 'spawn' })
+    expect(rows[1]?.data.version).toBe(2)
+    expect(() => migrate(rows.map(row => row.type === 'subagent/descriptor'
+      ? { ...row, data: { ...row.data, mode: 'continuable' } } : row))).toThrow('unsupported descriptor version')
+    expect(() => migrate(rows.map(row => row.type === 'subagent/descriptor'
+      ? { ...row, data: { ...row.data, unexpected: true } } : row))).toThrow()
+  })
+
   it('restores pre-identity user, assistant, and replacement tool-result identities', () => {
     const rows = [
       { type: 'turn/start', seq: 0, time: 1, data: { turn: 1 } },

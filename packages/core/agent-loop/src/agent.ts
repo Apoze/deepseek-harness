@@ -14,6 +14,7 @@ import type {
   InboxTarget,
   PreStepDecision,
   RequestErrorAction,
+  IncompleteResponseAction,
 } from '@deepseek-ai/dsh-agent'
 import { agentEvents, assembleContextFor } from '@deepseek-ai/dsh-agent'
 import type { GenerateOptions, LlmCallConfig, Message, PreparedLlmCall } from '@deepseek-ai/dsh-llm'
@@ -271,8 +272,7 @@ export class ReactLoopAgent implements Agent {
     const claimed = this.inbox.claim(target, position.turn)
     const assembly = await this.loopCtx.systemPrompt.assemble(assembleContextFor(this, signal))
     signal.throwIfAborted()
-    const sections = renderContextSections(assembly)
-    const context = this.runtimeContext.project(joinContextSections(sections), sections)
+    const context = this.projectRuntimeContext(assembly)
     const decision = await this.dispatch.waterfall(
       'agent/pre-step', { messages: claimed, ...position, signal },
       (): Promise<PreStepDecision> => Promise.resolve<PreStepDecision>({
@@ -283,6 +283,11 @@ export class ReactLoopAgent implements Agent {
     signal.throwIfAborted()
     if (decision.kind === 'reject') return decision
     return { ...decision, assembly }
+  }
+
+  private projectRuntimeContext(assembly: PromptAssembly): UserMessage | undefined {
+    const sections = renderContextSections(assembly)
+    return this.runtimeContext.project(joinContextSections(sections), sections)
   }
 
   /** Whether the assembled tool schemas differ from the logged request header's. */
@@ -420,9 +425,20 @@ export class ReactLoopAgent implements Agent {
         for (const message of decision.messages) {
           this.session.append('user/message', message, { surfaceOp: 'append' })
         }
+      } else {
+        const context = this.projectRuntimeContext(assembly)
+        if (context !== undefined) this.session.append('user/message', context, { surfaceOp: 'append' })
       }
       firstAttempt = false
       const request = this.buildRequest(config, preparedCall, assembly.tools, { turn, step }, startsRequestSeries, signal)
+      const inspection = await preparedCall?.inspect?.(request)
+      if (inspection) this.session.append('llm/request-inspected', { turn, step, inspection })
+      const admission = await this.dispatch.waterfall(
+        'agent/request-prepared', { turn, step, request, inspection, signal },
+        () => Promise.resolve<RequestErrorAction>(undefined),
+      )
+      signal.throwIfAborted()
+      if (admission?.kind === 'retry') continue
       const live = new AssistantStreamAttempt(
         this.session.id,
         ++this.assistantAttemptCounter,
@@ -486,6 +502,26 @@ export class ReactLoopAgent implements Agent {
       }
       try {
         const finish = live.finish
+        const invalidOutput = finish.kind === 'error' && finish.failure.code === 'invalid_model_output'
+        if (preparedCall?.inspect && (finish.kind === 'max-tokens' || invalidOutput)) {
+          let attemptSeq!: import('@deepseek-ai/dsh-session').SessionSeq
+          live.settle('assistant/attempt', () => {
+            attemptSeq = this.session.append('assistant/attempt', { turn, step, stream: live.stream }).seq
+            return attemptSeq
+          })
+          const action = await this.dispatch.waterfall(
+            'agent/response-incomplete', { turn, step, attemptSeq, finish, usage: live.usage, request, inspection, signal },
+            () => Promise.resolve<IncompleteResponseAction>(undefined),
+          )
+          signal.throwIfAborted()
+          if (action?.kind === 'retry') {
+            this.session.append('agent/generation-recovery', { turn, step, attemptSeq, ...action.context ? { context: action.context } : {} })
+            if (action.context) this.session.append('user/message', action.context, { surfaceOp: 'append' })
+            continue
+          }
+          if (finish.kind === 'max-tokens') return { kind: 'max-tokens' }
+          throw new LlmError(finish.failure.message, finish.failure.code, finish.failure)
+        }
         if (finish.kind === 'error' || finish.kind === 'aborted') {
           live.settle(
             'assistant/attempt',

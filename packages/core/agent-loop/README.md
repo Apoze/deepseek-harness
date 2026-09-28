@@ -227,3 +227,7 @@ These limits define when the loop needs special care. They are current package c
 None.
 
 </details>
+
+## Native generation admission and recovery
+
+For adapters exposing prepared inspection, the loop records `llm/request-inspected` and invokes `agent/request-prepared` before dispatch. A plugin may compact the context and request a fresh preparation. Incomplete native generations settle as assistant attempts before `agent/response-incomplete`; their tool calls never execute. Recovery requires an explicit bounded plugin decision. Ordinary adapters retain upstream partial-output semantics.

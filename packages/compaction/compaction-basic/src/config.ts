@@ -24,8 +24,12 @@ const DEFAULT_RETAIN_RATIO = 0.16
 
 /** Fields shared by top-level defaults and exact-target overrides. */
 const POLICY_CONFIG_KEYS = [
+  'admission',
+  'summarizationReasoningEffort',
+  'summarizationTools',
   'thresholdRatio',
   'headroomTokens',
+  'targetRatio',
   'retainRatio',
   'retainTokens',
   'summarizationProvider',
@@ -98,6 +102,10 @@ export function resolveConfig(config: BasicCompactionConfig = {}): ResolvedConfi
   return deepFreeze({
     thresholdRatio,
     headroomTokens,
+    ...config.targetRatio === undefined ? {} : { targetRatio: config.targetRatio },
+    admission: config.admission ?? 'step',
+    ...config.summarizationReasoningEffort === undefined ? {} : { summarizationReasoningEffort: config.summarizationReasoningEffort },
+    summarizationTools: config.summarizationTools ?? true,
     ...retention,
     summarizationProvider: config.summarizationProvider ?? '',
     summarizationModel: config.summarizationModel ?? '',
@@ -125,13 +133,19 @@ export function resolveTargetPolicy(
   const inheritedRetention: ResolvedRetention = config.retainTokens === undefined
     ? { retainRatio: config.retainRatio }
     : { retainTokens: config.retainTokens }
+  const targetRatio = override?.targetRatio ?? config.targetRatio
+  const summarizationReasoningEffort = override?.summarizationReasoningEffort ?? config.summarizationReasoningEffort
   return deepFreeze({
     target: { provider: target.provider, model: target.model },
     thresholdRatio: override?.thresholdRatio ?? config.thresholdRatio,
     headroomTokens: override?.headroomTokens ?? config.headroomTokens,
+    ...targetRatio === undefined ? {} : { targetRatio },
     ...resolveRetention(override ?? {}, inheritedRetention),
     summarizationProvider: override?.summarizationProvider ?? config.summarizationProvider,
     summarizationModel: override?.summarizationModel ?? config.summarizationModel,
+    admission: override?.admission ?? config.admission,
+    ...summarizationReasoningEffort === undefined ? {} : { summarizationReasoningEffort },
+    summarizationTools: override?.summarizationTools ?? config.summarizationTools,
     maxTokens: override?.maxTokens ?? config.maxTokens,
     compactionRetries: override?.compactionRetries ?? config.compactionRetries,
     maxOverflowRetries: override?.maxOverflowRetries ?? config.maxOverflowRetries,
@@ -206,10 +220,14 @@ export function resolveCompactSpec(
     target: { ...policy.target },
     contextWindow,
     thresholdRatio: policy.thresholdRatio,
+    ...policy.targetRatio === undefined ? {} : { targetRatio: policy.targetRatio },
     thresholdTokens,
     retainTokens,
     summarizationProvider: policy.summarizationProvider,
     summarizationModel: policy.summarizationModel,
+    admission: policy.admission,
+    ...policy.summarizationReasoningEffort === undefined ? {} : { summarizationReasoningEffort: policy.summarizationReasoningEffort },
+    summarizationTools: policy.summarizationTools,
     maxTokens: policy.maxTokens,
     compactionRetries: policy.compactionRetries,
     maxOverflowRetries: policy.maxOverflowRetries,
@@ -280,11 +298,18 @@ function validatePolicy(
 ): void {
   const thresholdRatio = config.thresholdRatio
   const headroomTokens = config.headroomTokens
+  if (config.admission !== undefined && config.admission !== 'step' && config.admission !== 'prepared') throw new Error(`${name}.admission must be step or prepared`)
+  if (config.summarizationReasoningEffort !== undefined && (typeof config.summarizationReasoningEffort !== 'string' || !config.summarizationReasoningEffort)) throw new Error(`${name}.summarizationReasoningEffort must be a nonempty effort id`)
+  if (config.summarizationTools !== undefined && typeof config.summarizationTools !== 'boolean') throw new Error(`${name}.summarizationTools must be boolean`)
   const retainRatio = config.retainRatio
   const retainTokens = config.retainTokens
   const maxTokens = config.maxTokens
   const compactionRetries = config.compactionRetries
   const maxOverflowRetries = config.maxOverflowRetries
+  if (config.targetRatio !== undefined) {
+    assertRatio(`${name}.targetRatio`, config.targetRatio)
+    if (typeof thresholdRatio === 'number' && config.targetRatio >= thresholdRatio) throw new Error(`${name}.targetRatio must be below thresholdRatio`)
+  }
   if (thresholdRatio !== undefined) assertRatio(`${name}.thresholdRatio`, thresholdRatio)
   if (headroomTokens !== undefined) assertNonNegativeInteger(`${name}.headroomTokens`, headroomTokens)
   if (retainRatio !== undefined) assertRatio(`${name}.retainRatio`, retainRatio)

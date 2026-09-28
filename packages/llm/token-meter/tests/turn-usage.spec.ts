@@ -66,6 +66,15 @@ function completeAttempt(...middle: readonly SessionEvent[]): SessionEvent[] {
 }
 
 describe('deriveTurnTokenUsage', () => {
+  it('accumulates a failed generation and its recovered response in one step', () => {
+    const result = deriveTurnTokenUsage(completeAttempt(
+      attempt(3, [{ type: 'usage', usage: usage() }, { type: 'finish', reason: { kind: 'max-tokens' } }]),
+      event(4, 'agent/generation-recovery', { turn: 1, step: 1, attemptSeq: 3 }),
+      message(5, usage()),
+    ))
+    expect(result).toMatchObject({ uncachedInputTokens: 200, outputTokens: 40, totalTokens: 340, cacheReadTokens: 100 })
+  })
+
   it('preserves authoritative totals and explicit optional buckets', () => {
     expect(deriveTurnTokenUsage(completeAttempt(message(3, usage({
       cacheWriteTokens: 0,

@@ -136,3 +136,7 @@ These limits define when the plugin needs special operational care. They are cur
 This Dev Note is working context for maintainers and is explicitly non-authoritative — shipped behavior and limits live in the sections above and in the code. The single-executable runtime distribution pairs this plugin with the packaged `jsonrpc-demo` bin; keep the shutdown/exit contract consistent with the app bin, which owns EOF and signal exits. No other unresolved design questions are recorded.
 
 </details>
+
+## Persisted session resume
+
+Resuming a stored session loads it through session persistence before accepting messages. The requested working directory must match the stored directory; a mismatch fails explicitly instead of silently creating an empty conversation.

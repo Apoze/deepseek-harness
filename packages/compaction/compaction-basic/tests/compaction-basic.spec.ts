@@ -311,6 +311,8 @@ describe('compact configuration and defaults', () => {
     const resolved = resolveConfig({})
 
     expect(resolved).toEqual({
+      admission: 'step',
+      summarizationTools: true,
       thresholdRatio: 0.8,
       headroomTokens: 65_536,
       retainRatio: 0.16,
@@ -743,6 +745,34 @@ describe('pressure measurement and retention', () => {
     await expect(compactIfNeeded(compact, session, 'context-overflow')).resolves.toBeNull()
     expect(session.surface.replaceGeneration).toBe(generation)
     expect(session.snapshotEvents().some(event => event.type === 'compaction/start')).toBe(false)
+  })
+
+  it('preserves an indivisible current request instead of dropping prepared retention', async () => {
+    const compact = service({ admission: 'prepared', targetRatio: 0.4, maxTokens: 100 }, createContext(10_000))
+    const session = Session.create(SessionId('indivisible-current-request'))
+    session.append('turn/start', { turn: 1 })
+    session.append('system/message', {
+      turn: 1, step: 1, message: createSystemMessage('System instructions'),
+    }, { surfaceOp: 'append' })
+    session.append('user/message', createUserMessage({
+      content: [{ type: 'text', text: 'Keep this complete request. '.repeat(3_000) }],
+      source: { kind: 'user' },
+    }), { surfaceOp: 'append' })
+    session.append('user/message', createUserMessage({
+      content: [{ type: 'text', text: 'Current runtime instructions' }],
+      source: { kind: 'runtime-context' },
+    }), { surfaceOp: 'append' })
+    session.append('llm/request-inspected', {
+      turn: 1, step: 1,
+      inspection: {
+        instanceId: 'test', inputTokens: 9_000, contextWindow: 10_000,
+        thinkingTokens: 0, thinkingClosureTokens: 0, maxOutputTokens: 1_000,
+        contentReserve: 1_500, safetyMargin: 0, compactionThreshold: 0.7,
+      },
+    })
+    const before = session.snapshotEvents()
+    await expect(compactIfNeeded(compact, session, 'context-overflow')).resolves.toBeNull()
+    expect(session.snapshotEvents()).toEqual(before)
   })
 
   it('does nothing below threshold and compacts a priced head above threshold', async () => {
@@ -1423,7 +1453,6 @@ describe('default one-shot summarizer', () => {
     const { adapter, compact } = await summarizerHarness([
       { type: 'reasoning', text: 'private' },
       { type: 'text', text: 'public summary' },
-      { type: 'tool-call', id: ToolCallId('unexpected'), name: 'x', arguments: '{}' },
     ], undefined, MODEL, {
       auto: false,
       summarizationProvider: MODEL,
@@ -1439,7 +1468,6 @@ describe('default one-shot summarizer', () => {
       rawOutput: [
         { type: 'reasoning', text: 'private' },
         { type: 'text', text: 'public summary' },
-        { type: 'tool-call', id: ToolCallId('unexpected'), name: 'x', arguments: '{}' },
       ],
       llmStreamCall: true,
       provider: MODEL,
@@ -1458,6 +1486,15 @@ describe('default one-shot summarizer', () => {
     })
     const instruction = adapter.lastOptions?.messages.at(-1)?.content[0]
     expect(instruction?.type === 'text' ? instruction.text : '').toContain('## Primary Request and Intent')
+  })
+
+  it('rejects a summary that mixes prose with a tool call', async () => {
+    const { compact } = await summarizerHarness([
+      { type: 'text', text: 'looks like a summary' },
+      { type: 'tool-call', id: ToolCallId('unexpected'), name: 'write', arguments: '{}' },
+    ])
+    await expect(compact.runSummarize(promptInput('transcript'), agent(conversation(1), MODEL)))
+      .rejects.toThrow('summarization attempted a tool call')
   })
 
   it('replays the conversation prefix and appends the instruction as the final message', async () => {
@@ -1634,6 +1671,12 @@ describe('default one-shot summarizer', () => {
 
   it('rejects empty or reasoning-only successful output', async () => {
     const { compact } = await summarizerHarness([{ type: 'reasoning', text: 'private' }])
+    await expect(compact.runSummarize(promptInput('history'), agent(conversation(1), MODEL)))
+      .rejects.toThrow(/no text summary content/)
+  })
+
+  it.each(['.', '...\n---', ' \n ', '！？'])('rejects punctuation-only checkpoints: %s', async (text) => {
+    const { compact } = await summarizerHarness([{ type: 'text', text }])
     await expect(compact.runSummarize(promptInput('history'), agent(conversation(1), MODEL)))
       .rejects.toThrow(/no text summary content/)
   })

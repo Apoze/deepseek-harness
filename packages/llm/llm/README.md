@@ -176,3 +176,7 @@ This Dev Note is non-authoritative working context: open questions and undecided
 - The `llm/adapters-updated` event is payload-free by design; consumers re-read the registries instead of receiving the new topology in the event.
 
 </details>
+
+## Prepared request inspection
+
+A prepared adapter may expose `inspect()` to count the exact projected request before dispatch. The bound call shares its projected messages with streaming, including V4 tool results and developer instructions. Adapters without this optional hook retain the upstream behavior. Inspection reports input size, output budget, context window and backend instance identity; it does not submit a generation.

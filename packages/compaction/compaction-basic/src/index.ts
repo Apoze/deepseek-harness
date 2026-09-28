@@ -26,6 +26,7 @@ import {
   assertNoActiveCompaction,
   compactSurfaceRegion,
   selectCompactableRange,
+  smallerCompactableRange,
 } from './region.ts'
 import { summarizeWithLlm } from './summarizer.ts'
 import type { SummarizationInput, SummaryResult } from './summarizer.ts'
@@ -93,10 +94,14 @@ const modelPolicy: z<ModelCompactPolicyConfig> = z.object({
   model: z.string().required(),
   thresholdRatio: thresholdRatioSchema,
   headroomTokens: headroomTokensSchema,
+  targetRatio: thresholdRatioSchema,
   retainRatio: retainRatioSchema,
   retainTokens: retainTokensSchema,
   summarizationProvider: summarizationProviderSchema,
   summarizationModel: summarizationModelSchema,
+  admission: z.union(['step', 'prepared']),
+  summarizationReasoningEffort: z.string(),
+  summarizationTools: z.boolean(),
   maxTokens: maxTokensSchema,
   compactionRetries: compactionRetriesSchema,
   maxOverflowRetries: maxOverflowRetriesSchema,
@@ -111,15 +116,19 @@ const modelPolicy: z<ModelCompactPolicyConfig> = z.object({
  * token meter.
  */
 export class BasicCompactionEngine extends CompactionEngine {
-  static inject = ['llm', 'tokenMeter', 'sessions']
+  static inject = ['llm', 'tokenMeter', 'sessions', 'sessionProjections']
 
   static Config: z<BasicCompactionConfig> = z.object({
     thresholdRatio: thresholdRatioSchema,
     headroomTokens: headroomTokensSchema,
+    targetRatio: thresholdRatioSchema,
     retainRatio: retainRatioSchema,
     retainTokens: retainTokensSchema,
     summarizationProvider: summarizationProviderSchema,
     summarizationModel: summarizationModelSchema,
+    admission: z.union(['step', 'prepared']),
+    summarizationReasoningEffort: z.string(),
+    summarizationTools: z.boolean(),
     maxTokens: maxTokensSchema,
     compactionRetries: compactionRetriesSchema,
     maxOverflowRetries: maxOverflowRetriesSchema,
@@ -274,6 +283,7 @@ export class BasicCompactionEngine extends CompactionEngine {
     const target = routedTarget(agent.session)
     if (target === undefined) return null
     const policy = resolveTargetPolicy(this.config, target)
+    if (trigger === 'pressure' && policy.admission === 'prepared') return null
     const meter = this.ctx.tokenMeter
     let measurement = meter.measure(agent.session)
     switch (trigger) {
@@ -292,13 +302,36 @@ export class BasicCompactionEngine extends CompactionEngine {
     const prune = this.ctx.get('toolResultPruner')
 
     if (trigger === 'context-overflow') {
+      const budget = policy.admission === 'prepared'
+        ? this.ctx.sessionProjections.stateOf(agent.session, 'contextPressure')?.preparedBudget
+        : undefined
       if (prune !== undefined) {
         prune.pruneSession(agent.session)
         measurement = meter.measure(agent.session)
       }
-      const range = selectCompactableRange(agent.session, measurement, 0)
+      // Prepared admission chooses a retained tail from the total target; exact
+      // admission re-counts the rebuilt request after this transaction returns.
+      const fixedTokens = Math.max(0, measurement.totalTokens - measurement.surfaceTokens)
+        + (measurement.nodes[0]?.tokens ?? 0)
+      const retainTokens = budget && policy.targetRatio !== undefined
+        ? Math.max(0, Math.floor(budget.contextWindow * policy.targetRatio) - fixedTokens - policy.maxTokens)
+        : 0
+      let range = selectCompactableRange(agent.session, measurement, retainTokens)
       if (range === null) return null
-      return this.compactRegion(range.start, range.end, agent, signal)
+      for (let attempt = 0; ; attempt += 1) {
+        signal.throwIfAborted()
+        try {
+          return await this.compactRegion(range.start, range.end, agent, signal)
+        } catch (error: unknown) {
+          signal.throwIfAborted()
+          if (!(error instanceof Error) || !('code' in error)
+            || error.code !== CONTEXT_WINDOW_EXCEEDED_CODE
+            || attempt >= policy.compactionRetries) throw error
+          const smaller = smallerCompactableRange(agent.session, range)
+          if (smaller === null) throw error
+          range = smaller
+        }
+      }
     }
 
     const info = await this.ctx.llm.resolveModelInfo(target.provider, target.model, signal)

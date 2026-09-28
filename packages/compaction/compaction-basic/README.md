@@ -259,3 +259,7 @@ This Dev Note is working context for maintainers and is explicitly non-authorita
 - **Overflow recovery beyond canonical errors, undecided** — recovery triggers on `CONTEXT_WINDOW_EXCEEDED` only; other provider-side context failures are not classified.
 
 </details>
+
+## Prepared admission and summary capacity
+
+`admission: prepared` delegates pressure admission to the final request hook. `targetRatio` chooses a recent balanced tail from desired total occupancy, accounting for fixed input and summary capacity. `summarizationReasoningEffort` and `summarizationTools` configure the auxiliary call independently. Its resolved input is recorded in `compaction/request`. Empty, truncated or tool-bearing summaries are rejected before replacement. Oversized auxiliary input retries a strictly smaller balanced prefix, bounded by `compactionRetries`; indivisible input fails explicitly.

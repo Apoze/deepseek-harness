@@ -28,6 +28,14 @@ export interface TokenUsageProjection {
  * the token-meter README for the full rationale.
  */
 export interface ContextPressureProjection {
+  /** Latest exact preparation, valid until the request envelope or surface changes. */
+  preparedBudget?: {
+    inputTokens: number
+    contextWindow: number
+    outputTokens: number
+    workReserve: number
+    safetyMargin: number
+  }
   /**
    * Provider-reported prompt size of the most recent request: uncached input
    * plus cache reads and writes. Response output is excluded, so this does not

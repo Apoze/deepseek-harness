@@ -21,6 +21,7 @@
  */
 export const KNOWN_SESSION_EVENT_TYPES: ReadonlySet<string> = new Set([
   'agent-preset/selected',
+  'agent/generation-recovery',
   'agent/inbox/spliced',
   'approval/asked',
   'approval/decided',
@@ -31,6 +32,7 @@ export const KNOWN_SESSION_EVENT_TYPES: ReadonlySet<string> = new Set([
   'command/run',
   'compaction/end',
   'compaction/prune',
+  'compaction/request',
   'compaction/start',
   'compaction/summary',
   'deliverables/presented',
@@ -42,6 +44,7 @@ export const KNOWN_SESSION_EVENT_TYPES: ReadonlySet<string> = new Set([
   'hook/invoked',
   'hook/result',
   'image/offload',
+  'llm/request-inspected',
   'llm/retry',
   'llm/retry-started',
   'model/selection',

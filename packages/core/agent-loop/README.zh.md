@@ -227,3 +227,7 @@ const handle = await ctx.agents.create({
 无。
 
 </details>
+
+## 原生生成准入与恢复
+
+对于提供预备检查的适配器，循环在发送前记录 `llm/request-inspected` 并调用 `agent/request-prepared`。插件可以压缩上下文并请求重新准备。不完整的原生生成先结算为助手尝试，再触发 `agent/response-incomplete`；其中的工具调用不会执行。恢复需要插件明确作出有界重试决定。普通适配器保持上游的部分输出语义。

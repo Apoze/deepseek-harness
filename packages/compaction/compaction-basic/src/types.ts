@@ -8,6 +8,15 @@ import type { LlmCallConfig } from '@deepseek-ai/dsh-llm'
 
 /** Policy fields shared by the default policy and exact model overrides. */
 export interface CompactionPolicyConfig {
+  /** Admission owner: step estimates, or final native counts handled before generation. */
+  admission?: 'step' | 'prepared'
+  /** Explicit reasoning effort for the auxiliary summary only. */
+  summarizationReasoningEffort?: string
+  /** Include the task tool catalog for summary cache reuse. Defaults to true. */
+  summarizationTools?: boolean
+
+  /** Desired total occupancy after prepared admission, including fixed input. */
+  targetRatio?: number
   /** Window fraction for pressure; capped at context window minus reserved output and `headroomTokens`. Defaults to `0.8`. */
   thresholdRatio?: number
   /** Additional pressure headroom beyond the routed output reservation. Non-negative integer; defaults to `65536`. */
@@ -51,8 +60,13 @@ export type ResolvedRetention =
 
 /** Validated policy fields shared before and after exact-target matching. */
 interface ResolvedPolicyFields {
+  readonly admission: 'step' | 'prepared'
+  readonly summarizationReasoningEffort?: string
+  readonly summarizationTools: boolean
+
   readonly thresholdRatio: number
   readonly headroomTokens: number
+  readonly targetRatio?: number
   readonly summarizationProvider: string
   readonly summarizationModel: string
   readonly maxTokens: number
