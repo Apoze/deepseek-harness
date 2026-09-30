@@ -132,7 +132,7 @@ if ($nodeMajor -lt 24) { throw 'Installer Node.js 24 ou superieur, puis rouvrir 
 $pluginVersions = [ordered]@{
     'dsh-file-mentions' = '1.1.1'
     'dsh-safe-download-files' = '0.2.0'
-    'dsh-llm-ninfer' = '0.2.1'
+    'dsh-llm-ninfer' = '0.2.2'
     'dsh-generation-recovery' = '0.2.1'
     'dsh-loop-guard' = '0.1.2'
     'dsh-web-fetch-local' = '0.2.1'
