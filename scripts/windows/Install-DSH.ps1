@@ -208,7 +208,7 @@ try {
     }
 
     # JSON is valid YAML; these are profile overrides, never duplicate insert entries.
-    $rows = @(@{ id = 'llm-ninfer'; disabled = (-not [bool]$NinferBaseUrl); config = @{
+    $ninferRows = @(@{ id = 'llm-ninfer'; disabled = (-not [bool]$NinferBaseUrl); config = @{
         provider = 'ninfer-local'; baseURL = $(if ($NinferBaseUrl) { $NinferBaseUrl } else { 'http://127.0.0.1:8000/v1' })
         credentialRef = 'NINFER_API_KEY'; models = @(@{
             id = $(if ($ModelId) { $ModelId } else { 'your-model-id' })
@@ -216,6 +216,7 @@ try {
         })
     } })
     $webRows = @(@{ id = 'web'; config = @{ fetchProvider = 'local-safe-readability'; searchProvider = 'searxng' } })
+    $rows = @()
     if ($SearxngUrl) { $webRows += @{ id = 'web-search-searxng'; config = @{ endpoint = $SearxngUrl } } }
     if ($ModelId) { $rows += @{ id = 'agent-default-model'; config = @{ provider = 'ninfer-local'; model = $ModelId } } }
     Set-Content -LiteralPath (Join-Path $DataHome 'cordis.patch.yml') -Value (ConvertTo-Json -InputObject $rows -Depth 15) -Encoding utf8
@@ -223,7 +224,10 @@ try {
     foreach ($profile in @('web', 'sdk', 'headless')) {
         $profileDir = Join-Path $DataHome "profiles\$profile"
         New-Item -ItemType Directory -Path $profileDir -Force | Out-Null
-        if ($profile -eq 'web') { Set-Content -LiteralPath (Join-Path $profileDir 'cordis.patch.yml') -Value (ConvertTo-Json -InputObject $webRows -Depth 10) -Encoding utf8 }
+        # Native settings cannot edit entries overridden by the global home patch.
+        $profileRows = @($ninferRows)
+        if ($profile -eq 'web') { $profileRows += $webRows }
+        Set-Content -LiteralPath (Join-Path $profileDir 'cordis.patch.yml') -Value (ConvertTo-Json -InputObject $profileRows -Depth 10) -Encoding utf8
         foreach ($name in $pluginVersions.Keys) {
             if ($profile -ne 'web' -and $name -notin @('dsh-llm-ninfer', 'dsh-generation-recovery', 'dsh-loop-guard')) { continue }
             $spec = 'link:' + (Join-Path $plugins $name).Replace('\', '/')
