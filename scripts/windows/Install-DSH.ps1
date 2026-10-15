@@ -130,7 +130,7 @@ $nodeMajor = [int]((& $node --version).TrimStart('v').Split('.')[0])
 if ($nodeMajor -lt 24) { throw 'Installer Node.js 24 ou superieur, puis rouvrir PowerShell.' }
 
 $pluginVersions = [ordered]@{
-    'dsh-file-mentions' = '1.1.2'
+    'dsh-file-mentions' = '1.1.3'
     'dsh-safe-download-files' = '0.2.1'
     'dsh-llm-ninfer' = '0.2.3'
     'dsh-generation-recovery' = '0.2.2'
