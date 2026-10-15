@@ -1,4 +1,4 @@
-# Agent Note: NInfer native support on 0.2.0-rc.1
+# Agent Note: NInfer native support on 0.2.1-alpha.4
 
 Status: implemented
 
@@ -10,7 +10,7 @@ The previous native fork used pre-V4 messages, settings and preset contracts. A 
 
 ## Decision
 
-Keep the upstream 0.2.0-rc.1 message projection and add optional prepared inspection. Native recovery runs before tool execution and ordinary providers retain upstream behavior. Persisted SDK sessions load before resume. The legacy reader promotes only exact version-2 one-shot subagent descriptors, whose identity is unchanged in version 3.
+Keep the upstream 0.2.1-alpha.4 message projection and add optional prepared inspection. Native recovery runs before tool execution and ordinary providers retain upstream behavior. Persisted SDK sessions use the upstream explicit resume API. The legacy reader promotes only exact version-2 one-shot subagent descriptors, whose identity is unchanged in version 3.
 
 ## Alternatives considered
 

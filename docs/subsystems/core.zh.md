@@ -110,7 +110,7 @@ interface Agent {
    * turn and runs when the aborted activity converges to idle; a `disposed`
    * cancel leaves it parked. A wake submitted while already idle always opens
    * its turn boundary, even when its message is cleared before the driver
-   * claims ([cancel-convergence wake latch](../../../../.agents/notes/implemented/bug-fix/2026-08-07-cancel-convergence-wake-latch.md)).
+   * claims ([driver wake convergence](../../agent-loop/src/agent.ts)).
    * @param message - identified content and the source that supplied it.
    * @param target - the preferred next-turn or next-step inbox boundary.
    * @param wakeup - whether delivery may wake the driver.
@@ -363,6 +363,8 @@ type SessionStartSource = 'startup' | 'resume' | 'clear' | 'compact'
 
 其完整字段、`defineTool`/`ValueSchemaSpec`/`ParameterSchemaSpec` 类型化 schema DSL、`ToolExecution`/`ToolExecutionResult` waterfall 类型，以及工具展示 UI 类型都在 **[tools.md](tools.zh.md)** 中。
 
+<a id="repo-wide-type-patterns"></a>
+
 ## 全仓通用类型模式
 
 两个模式在每个子系统中反复出现，只在此处记录一次。
@@ -505,6 +507,12 @@ Registry of YAML-declared presets and the revisions live Agents retain.
  */
 async register(definition: PresetDefinition): Promise<() => Promise<void>>
 
+/** Inspect retained revisions, or the exact revision an Agent joined.
+ * @param ctx - optional Agent context; omission includes all retained revisions.
+ * @returns detached module references and isolation diagnostics; no match returns an empty list.
+ */
+inspectCompositions(ctx?: Context): AgentPresetInspection[]
+
 /** Read every declared preset, including activation failures.
  * @returns Display metadata and loading diagnostics.
  */
@@ -561,7 +569,9 @@ serviceFor<K extends string & keyof Context>(agent: { ctx: Context }, name: K): 
  */
 async recompose(ctx: Context, id: string): Promise<AgentPreset>
 
-/** Select a preset before a session starts its first turn.
+/** Select a preset before a session starts its first turn. A Session whose
+ * log records the preset and whose Agent runs its current revision keeps its
+ * composition; nothing is logged or announced.
  * @param agent Target Agent.
  * @param agentPreset Requested identity.
  * @returns Committed preset identity.
@@ -1011,6 +1021,48 @@ Types: [LlmFailure](llm-streaming.zh.md) · [ResolvedRetryPolicy](llm-streaming.
 
 Source: [`packages/core/agent/src/runtime-types.ts`](../../packages/core/agent/src/runtime-types.ts)
 
+<a id="agentrequest-prepared--waterfall"></a>
+
+#### `agent/request-prepared` — waterfall
+
+Inspect the fully assembled, measured request before generation. Retry rebuilds it from the log.
+
+```ts cordis-catalog
+/**
+ * Inspect the fully assembled, measured request before generation. Retry rebuilds it from the log.
+ * @param payload - agent, request coordinates, immutable request, optional native count, and cancellation.
+ * @param next - delegates admission to the next listener.
+ * Scope-filtered dispatch: agent-scoped listeners receive only their owning agent.
+ * @mode waterfall
+ */
+'agent/request-prepared'(this: Scoped<Agent>, payload: { agent: Agent; turn: number; step: number; request: GenerateOptions; inspection: LlmRequestInspection | undefined; signal: AbortSignal }, next: () => Promise<RequestErrorAction>): Promise<RequestErrorAction>
+```
+
+Types: [GenerateOptions](llm-streaming.zh.md) · [LlmRequestInspection](llm-streaming.zh.md) · [Scoped](scope.zh.md)
+
+Source: [`packages/core/agent/src/runtime-types.ts`](../../packages/core/agent/src/runtime-types.ts)
+
+<a id="agentresponse-incomplete--waterfall"></a>
+
+#### `agent/response-incomplete` — waterfall
+
+Recover a durably rejected generation before executing any tool or closing its step.
+
+```ts cordis-catalog
+/**
+ * Recover a durably rejected generation before executing any tool or closing its step.
+ * @param payload - agent, coordinates, settled attempt, original finish, usage, request, and cancellation.
+ * @param next - delegates recovery; undefined preserves the incomplete or error outcome.
+ * Scope-filtered dispatch: agent-scoped listeners receive only their owning agent.
+ * @mode waterfall
+ */
+'agent/response-incomplete'(this: Scoped<Agent>, payload: { agent: Agent; turn: number; step: number; attemptSeq: SessionSeq; finish: FinishReason; usage: TokenUsage | undefined; request: GenerateOptions; inspection: LlmRequestInspection | undefined; signal: AbortSignal }, next: () => Promise<IncompleteResponseAction>): Promise<IncompleteResponseAction>
+```
+
+Types: [FinishReason](llm-streaming.zh.md) · [GenerateOptions](llm-streaming.zh.md) · [LlmRequestInspection](llm-streaming.zh.md) · [Scoped](scope.zh.md) · [SessionSeq](session.zh.md) · [TokenUsage](llm-streaming.zh.md)
+
+Source: [`packages/core/agent/src/runtime-types.ts`](../../packages/core/agent/src/runtime-types.ts)
+
 <a id="agentstatus--emit"></a>
 
 #### `agent/status` — emit
@@ -1113,3 +1165,8 @@ One session committed a different agent preset to its durable log. Consumers inv
 
 Source: [`packages/preset/agent-preset-registry/src/types.ts`](../../packages/preset/agent-preset-registry/src/types.ts)
 <!-- END GENERATED cordis-surface -->
+
+```ts type-equiv
+/** Recovery before an incomplete attempt becomes conversation history. */
+type IncompleteResponseAction = { kind: 'retry'; context?: UserMessage } | undefined
+```

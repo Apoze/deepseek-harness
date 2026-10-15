@@ -35,7 +35,7 @@ Ordinary-session candidates come from the `skills/list` Remote; the host serves 
 
 The `preparing` stage shows only the skill icon and title, with no requested skill name or expansion. The `start` and `result` stages use the recorded arguments and output described below; preparation does not consult the installed catalog.
 
-A collapsed row renders the skill glyph, `Skill` title, and requested skill name on the same secondary font-size axis, line height, row height, and glyph scaling as ordinary Tool rows. Every lifecycle state retains the ordinary skill glyph; running calls carry one left-to-right highlight across the title, separator, and skill name, while failures replace the name with the first error line and interruptions retain their explicit status text. A settled row expands into a bounded `Instructions` card containing the exact durable tool output, with the standard trajectory `Inspect` affordance when available; this expanded card keeps its own typography. The row derives its name, lifecycle, and body only from the frozen call/result slice supplied by ui-tool, never from the current catalog, so replay stays stable when installed skills or their descriptions change.
+A collapsed row renders the skill glyph, `Skill` title, and requested skill name on the same secondary font-size axis, line height, row height, and glyph scaling as ordinary Tool rows. Every lifecycle state retains the ordinary skill glyph; running calls carry one left-to-right highlight across the title, separator, and skill name, while failures replace the name with the first error line and interruptions retain their explicit status text. A settled row expands into a bounded `Instructions` card containing the exact durable tool output, with the standard trajectory `Inspect` affordance when available; this expanded card keeps its own typography. The row derives its name, lifecycle, and body only from the frozen call/result slice supplied by ui-tool, never from the current catalog, so replay stays stable when installed skills or their descriptions change. Text and icons are tertiary at rest and secondary on hover; error and interruption text retains its semantic color.
 
 Hovering over `/name` highlights the entire reference. Clicking a known skill opens its provider-supplied `SKILL.md` path in the right Sidebar while keeping the token editable. An uncached click shares the per-Session catalog fetch and opens when it completes, retaining the clicked Session address. Preset changes, connection resets, and plugin disposal cancel pending previews; a later click fetches the current catalog again. Skills without a file path remain invocable but have no file preview.
 
@@ -58,6 +58,8 @@ Each catalog fetch requires an existing retained Client Session and waits for it
 ### Registration
 
 The `/client` exports are the plugin body (`apply`/`inject`) only; the source object is internal to the registration effect. The tool row registers the `skill` wire name in ui-tool's keyed `tool.call.toolview` slot.
+
+For sent text, the plugin registers a UserText matcher that returns one next original-text candidate using caller-confirmed `skillNames` and owns the `skill` entry in `conversation.user.text.node`. The renderer receives `openSkill` from its own Session-bound injection and delegates to this source’s preview operation, not to Chat owner props. Non-interactive previews remain labels. [UserText](../ui-conversation/README.md#sent-user-text) owns evaluation and node dispatch.
 
 </details>
 
@@ -112,5 +114,3 @@ These limits define where the reference and the row fall back to generic behavio
 None.
 
 </details>
-
-**Runtime invariant:** No companion is published. The slash source, locale dictionaries, and keyed toolview are registry-owned registrations whose disposal is proven by the HMR-safety spec. They emit no Cordis events and own no cross-plugin mutable state.

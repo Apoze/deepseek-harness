@@ -54,11 +54,14 @@
   en: 246736aa86d3013d
   zh: 35e261927ba0699c
 /deepseek-ai-dsh-compaction-basic/understand-the-implementation/source-map:
-  en: bd9d1e01ec833593
-  zh: cbadca50d8e9ed07
+  en: 3f1d7a55b790e623
+  zh: 39e878c0785a885c
 /deepseek-ai-dsh-compaction-basic/further-exploration:
   en: 84b5b81eb9b5965d
   zh: 7000af0fa502fcc1
+/deepseek-ai-dsh-compaction-basic/further-exploration/prepared-admission-and-summary-capacity:
+  en: 81319730d36e5cf5
+  zh: c049578270eca315
 /deepseek-ai-dsh-compaction-basic/model-experience:
   en: 215e7ba838619b7b
   zh: a311da3843709f90
@@ -98,6 +101,3 @@
 /deepseek-ai-dsh-compaction-basic/known-limitations-and-deferred-work/dev-note:
   en: 1fec7b90c3b68c49
   zh: ad9ae54a598846d0
-/deepseek-ai-dsh-compaction-basic/prepared-admission-and-summary-capacity:
-  en: f7a4d3ced2ce396f
-  zh: dc5143f0da80b27e

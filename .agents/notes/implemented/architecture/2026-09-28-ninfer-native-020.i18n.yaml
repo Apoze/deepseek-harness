@@ -2,21 +2,21 @@
 # section, a hash of its English and Chinese blocks outside code blocks and generated regions.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-28-ninfer-native-020.md
-/agent-note-ninfer-native-support-on-0-2-0-rc-1:
-  en: c892aab0c507d5d0
-  zh: 7b7a66afd0bf8476
-/agent-note-ninfer-native-support-on-0-2-0-rc-1/problem:
+/agent-note-ninfer-native-support-on-0-2-1-alpha-4:
+  en: 61c7d210ed04f730
+  zh: d0023319d50adf14
+/agent-note-ninfer-native-support-on-0-2-1-alpha-4/problem:
   en: bf1228e61320d73b
   zh: d1abd5770fbe1114
-/agent-note-ninfer-native-support-on-0-2-0-rc-1/decision:
-  en: 97978a93ca0abbf7
-  zh: daec7d81ef1f812a
-/agent-note-ninfer-native-support-on-0-2-0-rc-1/alternatives-considered:
+/agent-note-ninfer-native-support-on-0-2-1-alpha-4/decision:
+  en: 9692939e977efcb0
+  zh: 6ce7238283bac44c
+/agent-note-ninfer-native-support-on-0-2-1-alpha-4/alternatives-considered:
   en: 8b26da6d4d47fb09
   zh: 4c9dd7a187d38a16
-/agent-note-ninfer-native-support-on-0-2-0-rc-1/consequences:
+/agent-note-ninfer-native-support-on-0-2-1-alpha-4/consequences:
   en: 18ed9546618afbf8
   zh: 460ac06c7919c392
-/agent-note-ninfer-native-support-on-0-2-0-rc-1/verification:
+/agent-note-ninfer-native-support-on-0-2-1-alpha-4/verification:
   en: c95dbc965806911f
   zh: 8297a68cecdcd564

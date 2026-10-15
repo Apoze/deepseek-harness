@@ -137,7 +137,6 @@ kind: "package-reference"
 | [`src/summarizer.ts`](src/summarizer.ts) | 默认 `ctx.llm.stream()` 摘要、检查点框定、安全摘要投影 |
 | [`src/config.ts`](src/config.ts) | 加载时验证与路由模型策略解析 |
 | [`src/types.ts`](src/types.ts) | `BasicCompactionConfig` 与已解析策略词汇 |
-| — | 不发布运行时不变式配套条目；除所属 seam 强制执行的约定外，本包不公开独立事件序列或可变数据关系。持久标记对仍可在会话日志中观察。 |
 
 </details>
 
@@ -158,6 +157,11 @@ kind: "package-reference"
 -----
 
 <a id="model-experience"></a>
+
+### 预备准入与摘要容量
+
+`admission: prepared` 将压力准入交给最终请求钩子。`targetRatio` 根据目标总占用量保留最近的平衡尾部，同时计入固定输入和摘要容量。`summarizationReasoningEffort` 与 `summarizationTools` 独立配置辅助调用，其解析后的输入记录在 `compaction/request` 中。空摘要、截断摘要或包含工具调用的摘要在替换前被拒绝。辅助输入过大时，按 `compactionRetries` 限定次数重试更小的平衡前缀；无法拆分的输入明确失败。
+
 ## 模型体验
 
 ### 会话历史
@@ -259,7 +263,3 @@ Rules:
 - **规范错误之外的溢出恢复，尚未决定**——恢复仅针对 `CONTEXT_WINDOW_EXCEEDED` 触发；其他提供方侧上下文失败不参与分类。
 
 </details>
-
-## 预备准入与摘要容量
-
-`admission: prepared` 将压力准入交给最终请求钩子。`targetRatio` 根据目标总占用量保留最近的平衡尾部，同时计入固定输入和摘要容量。`summarizationReasoningEffort` 与 `summarizationTools` 独立配置辅助调用，其解析后的输入记录在 `compaction/request` 中。空摘要、截断摘要或包含工具调用的摘要在替换前被拒绝。辅助输入过大时，按 `compactionRetries` 限定次数重试更小的平衡前缀；无法拆分的输入明确失败。

@@ -130,13 +130,13 @@ $nodeMajor = [int]((& $node --version).TrimStart('v').Split('.')[0])
 if ($nodeMajor -lt 24) { throw 'Installer Node.js 24 ou superieur, puis rouvrir PowerShell.' }
 
 $pluginVersions = [ordered]@{
-    'dsh-file-mentions' = '1.1.1'
-    'dsh-safe-download-files' = '0.2.0'
-    'dsh-llm-ninfer' = '0.2.2'
-    'dsh-generation-recovery' = '0.2.1'
-    'dsh-loop-guard' = '0.1.2'
-    'dsh-web-fetch-local' = '0.2.1'
-    'dsh-web-search-searxng' = '0.2.1'
+    'dsh-file-mentions' = '1.1.2'
+    'dsh-safe-download-files' = '0.2.1'
+    'dsh-llm-ninfer' = '0.2.3'
+    'dsh-generation-recovery' = '0.2.2'
+    'dsh-loop-guard' = '0.1.3'
+    'dsh-web-fetch-local' = '0.2.2'
+    'dsh-web-search-searxng' = '0.2.2'
 }
 $savedEnvironment = @{}
 foreach ($entry in Get-ChildItem Env:) {
@@ -158,7 +158,7 @@ try {
     Write-Host 'Telechargement de la fork Apoze...'
     $coreRecord = Get-SourceArchive 'deepseek-harness' $core
     $manifest = Get-Content -LiteralPath (Join-Path $core 'package.json') -Raw | ConvertFrom-Json
-    if ($manifest.version -ne '0.2.0-rc.1') { throw 'Version DSH inattendue ; adapter et revalider cet installateur.' }
+    if ($manifest.version -ne '0.2.1-alpha.4') { throw 'Version DSH inattendue ; adapter et revalider cet installateur.' }
     $env:DSH_CLIENT_COMMIT_HASH = $coreRecord.commit
     Invoke-Checked $npm @('install', '--prefix', $toolRoot, '--no-save', '--no-package-lock', '--no-audit', '--no-fund', 'pnpm@11.7.0')
     $pnpm = Join-Path $toolRoot 'node_modules\pnpm\bin\pnpm.cjs'
@@ -227,6 +227,11 @@ try {
         # Native settings cannot edit entries overridden by the global home patch.
         $profileRows = @($ninferRows)
         if ($profile -eq 'web') { $profileRows += $webRows }
+        if ($profile -eq 'headless') {
+            foreach ($id in @('credentials', 'authorization', 'deepseek-account')) {
+                $profileRows += @{ id = $id; disabled = $false }
+            }
+        }
         Set-Content -LiteralPath (Join-Path $profileDir 'cordis.patch.yml') -Value (ConvertTo-Json -InputObject $profileRows -Depth 10) -Encoding utf8
         foreach ($name in $pluginVersions.Keys) {
             if ($profile -ne 'web' -and $name -notin @('dsh-llm-ninfer', 'dsh-generation-recovery', 'dsh-loop-guard')) { continue }

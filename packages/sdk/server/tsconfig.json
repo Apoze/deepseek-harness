@@ -36,7 +36,7 @@
       "path": "../../subagent/subagent"
     },
     {
-      "path": "../../session/session-persistence"
+      "path": "../../session/working-directory"
     }
   ]
 }

@@ -21,11 +21,11 @@
   en: c3ecb5a1421f27db
   zh: 4bbd3c0e513845e1
 /deepseek-ai-dsh-llm/use-this-package/minimal-composition:
-  en: 7550d716b90fcb09
-  zh: 77891a44ee623c7a
+  en: 9d481d19dc52e404
+  zh: aa09cf4462e93ba6
 /deepseek-ai-dsh-llm/use-this-package/what-you-can-do:
-  en: b45d7a414141734e
-  zh: a641c8ea3827cee6
+  en: dc61eb86585f6e0d
+  zh: 9c0d6b240dfd2cda
 /deepseek-ai-dsh-llm/use-this-package/failures-and-recovery:
   en: 311d8c92447b7094
   zh: 68cf5cb1c3853cc1
@@ -39,14 +39,17 @@
   en: ae1618577f4e8364
   zh: a6e8ab1563c08dfb
 /deepseek-ai-dsh-llm/understand-the-implementation/main-flow:
-  en: 6dc955a0d80f6ca0
-  zh: f81dbcaeacd8b269
+  en: c95d4947745e39bb
+  zh: ec37b969f27629e2
 /deepseek-ai-dsh-llm/understand-the-implementation/invariants:
   en: 0163a050239248e5
   zh: 885c95bedcbe2ff4
 /deepseek-ai-dsh-llm/further-exploration:
   en: 37e1d696afef8a88
   zh: 81f99c4507663cad
+/deepseek-ai-dsh-llm/further-exploration/prepared-request-inspection:
+  en: 75000da340bcd35e
+  zh: d09d1630f2dcbc0f
 /deepseek-ai-dsh-llm/model-experience:
   en: fa5677003ad6bc0a
   zh: ba33cfc860d9c37c
@@ -62,6 +65,3 @@
 /deepseek-ai-dsh-llm/known-limitations-and-deferred-work/dev-note/open-items:
   en: 6b1a7e903e13ee21
   zh: bb62f2b1cc484bd5
-/deepseek-ai-dsh-llm/prepared-request-inspection:
-  en: 7bf0b2e66fc1147d
-  zh: c2a9b35f6c1624f7

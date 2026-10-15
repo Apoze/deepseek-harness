@@ -137,7 +137,6 @@ The transaction validates the surface span and the durable lock, appends `compac
 | [`src/summarizer.ts`](src/summarizer.ts) | Default `ctx.llm.stream()` summarization, checkpoint framing, safe-summary projection |
 | [`src/config.ts`](src/config.ts) | Load-time validation and routed-model policy resolution |
 | [`src/types.ts`](src/types.ts) | `BasicCompactionConfig` and resolved policy vocabulary |
-| — | No runtime invariant companion is published; this package exposes no independent event sequence or mutable data relation beyond contracts enforced at its owning seam. The durable bracket remains observable in the session log. |
 
 </details>
 
@@ -158,6 +157,11 @@ Read these pages when the package-level contract is not enough; they move from t
 -----
 
 <a id="model-experience"></a>
+
+### Prepared admission and summary capacity
+
+`admission: prepared` delegates pressure admission to the final request hook. `targetRatio` chooses a recent balanced tail from desired total occupancy, accounting for fixed input and summary capacity. `summarizationReasoningEffort` and `summarizationTools` configure the auxiliary call independently. Its resolved input is recorded in `compaction/request`. Empty, truncated or tool-bearing summaries are rejected before replacement. Oversized auxiliary input retries a strictly smaller balanced prefix, bounded by `compactionRetries`; indivisible input fails explicitly.
+
 ## Model Experience
 
 ### Conversation history
@@ -259,7 +263,3 @@ This Dev Note is working context for maintainers and is explicitly non-authorita
 - **Overflow recovery beyond canonical errors, undecided** — recovery triggers on `CONTEXT_WINDOW_EXCEEDED` only; other provider-side context failures are not classified.
 
 </details>
-
-## Prepared admission and summary capacity
-
-`admission: prepared` delegates pressure admission to the final request hook. `targetRatio` chooses a recent balanced tail from desired total occupancy, accounting for fixed input and summary capacity. `summarizationReasoningEffort` and `summarizationTools` configure the auxiliary call independently. Its resolved input is recorded in `compaction/request`. Empty, truncated or tool-bearing summaries are rejected before replacement. Oversized auxiliary input retries a strictly smaller balanced prefix, bounded by `compactionRetries`; indivisible input fails explicitly.

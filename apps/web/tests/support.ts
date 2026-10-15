@@ -41,6 +41,15 @@ export const ZH_BROWSER_LOCALE = 'zh-CN'
 /** Same-day anchor for seeded event times and the Asia/Shanghai browser clock. */
 export const WEB_FIXTURE_TIME = Date.parse('2026-01-15T12:00:00+08:00')
 
+/**
+ * Budget for a plugin-manager switch to republish its state after a click: the
+ * click starts a Host profile write, and the store's follow-up `load()` re-reads
+ * its inventory before the switch shows the new value. That chain measured
+ * 0.5-0.8 s on an idle host and 2.0-4.8 s across 32 samples in a 16-worker lane,
+ * so Vitest's 1-second `expect.poll` default expires first.
+ */
+export const PLUGIN_TOGGLE_SETTLE_MS = 10_000
+
 /** How often a pinned browser clock advances, in milliseconds. */
 const PINNED_CLOCK_STEP_MS = 250
 
@@ -136,7 +145,7 @@ export async function expandTurnProcesses(page: Page): Promise<void> {
 }
 
 /**
- * Expand the Turn process and secondary group containing a hidden descendant.
+ * Expand the settled Turn process and secondary group containing a hidden descendant.
  * @param page - page containing the Chat view.
  * @param target - descendant whose outer process disclosures should open.
  */
@@ -145,7 +154,10 @@ export async function expandOwningTurnProcess(page: Page, target: Locator): Prom
   const turn = await target.evaluate(element => element.closest<HTMLElement>('[data-chat-turn]')?.dataset.chatTurn)
   if (turn !== undefined) {
     const control = page.locator(`[data-turn-process="${turn}"]`)
-    if (await control.count() > 0 && await control.getAttribute('aria-expanded') === 'false') await control.click()
+    if (await control.count() > 0) {
+      await control.waitFor({ state: 'visible', timeout: 10_000 })
+      if (await control.getAttribute('aria-expanded') === 'false') await control.click()
+    }
   }
   const group = target.locator('xpath=ancestor::*[@data-chat-group-key][1]')
   const header = group.locator('[data-process-activity]').first()
@@ -315,16 +327,11 @@ export function conversationContextKey(kind: string, id: string): string {
   return `${kind.length}:${kind}${id}`
 }
 
-/** Open Settings through the Web gear or Desktop account menu.
+/** Open Settings through the sidebar account menu.
  * @param page - browser page with the mounted sidebar.
  * @param locale - current UI language.
  */
 export async function openSettings(page: Page, locale: 'en' | 'zh'): Promise<void> {
-  const label = locale === 'zh' ? '设置' : 'Settings'
-  if (await page.evaluate(() => 'dshDesktop' in globalThis)) {
-    await page.getByRole('button', { name: locale === 'zh' ? '账号菜单' : 'Account menu', exact: true }).click()
-    await page.getByRole('menuitem', { name: label, exact: true }).click()
-  } else {
-    await page.getByRole('button', { name: label, exact: true }).click()
-  }
+  await page.getByRole('button', { name: locale === 'zh' ? '账号菜单' : 'Account menu', exact: true }).click()
+  await page.getByRole('menuitem', { name: locale === 'zh' ? '设置' : 'Settings', exact: true }).click()
 }
