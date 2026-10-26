@@ -386,14 +386,14 @@ describe('native generation accounting', () => {
 describe('contextPressure session projection', () => {
   it('serves no pressure or capacity for an empty log', async () => {
     const { ctx, session } = await harness()
-    expect(pressure(ctx, session)).toEqual({})
+    expect(ctx.tokenMeter.contextPressure(session)).toEqual({})
   })
 
   it('does not synthesize zero pressure before a provider usage sample', async () => {
     const { ctx, session } = await harness()
     startStep(session, 1, 1)
     recordContext(session, 'small', 64_000)
-    expect(pressure(ctx, session)).toEqual({ contextWindow: 64_000 })
+    expect(ctx.tokenMeter.contextPressure(session)).toEqual({ contextWindow: 64_000 })
   })
 
   it('sums prompt-side buckets and excludes response output', async () => {
@@ -407,7 +407,8 @@ describe('contextPressure session projection', () => {
     }, 1, 1)
     // Output is deliberately absent: occupancy describes the prompt that was
     // sent, so it holds still while the response streams.
-    expect(pressure(ctx, session).pressureTokens).toBe(125)
+    expect(ctx.tokenMeter.contextPressure(session)).toEqual({ pressureTokens: 125 })
+    expect(pressure(ctx, session)).toEqual({ pressureTokens: 125, projectedTokens: 125 })
   })
 
   it('replaces pressure with the newest request rather than accumulating', async () => {
@@ -471,7 +472,7 @@ describe('contextPressure session projection', () => {
     const checkpoint = JSON.parse(JSON.stringify(
       ctx.sessionProjections.checkpoint(session),
     )) as ReturnType<typeof ctx.sessionProjections.checkpoint>
-    expect(checkpoint.contextPressure?.ver).toBe(5)
+    expect(checkpoint.contextPressure?.ver).toBe(6)
 
     await meterFiber.dispose()
     expect(ctx.sessionProjections.snapshot(session).values).not.toHaveProperty('contextPressure')
