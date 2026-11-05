@@ -1,0 +1,28 @@
+# Bilingual-pair consistency record for 2026-11-05-native-022.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/persistence-changes/2026-11-05-native-022.md
+/:
+  en: 3d5a424ae7d7e46b
+  zh: c22a8e4a62d8cc1a
+/2026-11-05-native-022:
+  en: e80c43541ff67bf7
+  zh: 0f5e559a7240a284
+/2026-11-05-native-022/summary:
+  en: 39c6d13fa91af8f9
+  zh: e73a62c5a3530982
+/2026-11-05-native-022/table-of-contents:
+  en: 6cf314a069ceb451
+  zh: 9adff678e9ecab3b
+/2026-11-05-native-022/declaration:
+  en: 6907136f28e48c90
+  zh: 02f8298485f3d8e7
+/2026-11-05-native-022/compatibility:
+  en: 264e3db7abf96e0f
+  zh: 864f6d94aee1e79a
+/2026-11-05-native-022/verification:
+  en: 6d8121a4cf14f87d
+  zh: f834195a1051ff5d
+/2026-11-05-native-022/dev-note:
+  en: b75c8458928b72b9
+  zh: 003ba4e17b4b5269
