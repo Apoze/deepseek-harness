@@ -12,8 +12,8 @@
   en: 78dd767ba538633e
   zh: 2df8bcbca500b05c
 /session-persistence-event-catalog/event-envelope:
-  en: f20d9aa037e10093
-  zh: 4ea8bc2bbc353f7d
+  en: b48be3e2b5d2314b
+  zh: 0e2adb690f4c8f7a
 /session-persistence-event-catalog/events:
   en: f4776ba3d0fd53ce
   zh: e86769f50a69055a
@@ -309,8 +309,8 @@
   en: e8dd0cebbb930eb7
   zh: e8dd0cebbb930eb7
 /session-persistence-event-catalog/events/working-directory/working-directory-change-log-only:
-  en: 075369b880bd304b
-  zh: 0eca94dbaf5d9090
+  en: 27f0761cbdd6fe2f
+  zh: 33528f333498132d
 /session-persistence-event-catalog/events/workspace:
   en: 63ee1a85e4b59ae3
   zh: 63ee1a85e4b59ae3
@@ -1260,8 +1260,8 @@
   en: c4ba1947afb282d5
   zh: c0b5e02f7be7f1a3
 /session-persistence-event-catalog/resolved-persistence-types/sandboxmode:
-  en: c9fa5343ea99733b
-  zh: d6de41351c57a73f
+  en: 5adc2bf6745ccc67
+  zh: 566cb9aaa4a177c9
 /session-persistence-event-catalog/resolved-persistence-types/schedulechange:
   en: b20a355fde48f699
   zh: 5d0fd858e2dbff06
@@ -1368,8 +1368,8 @@
   en: 0080c345c319a4b5
   zh: de1a8b3ed621ce21
 /session-persistence-event-catalog/resolved-persistence-types/toolrestriction:
-  en: d70be5d46cb1ef7d
-  zh: d3d5a05d62e443fe
+  en: b2488366535b5fdc
+  zh: b64d50345521eb99
 /session-persistence-event-catalog/resolved-persistence-types/toolresultmessage:
   en: 2258683c3cfa4ce3
   zh: 5663aa76c911761b
@@ -1572,8 +1572,8 @@
   en: 1ee4979d82eb6363
   zh: 406f07cbff278ddb
 /session-persistence-event-catalog/resolved-persistence-types/cwd:
-  en: 1bc55be85a68f0a3
-  zh: 9e84a55ed11bba5d
+  en: 2809c921c6996791
+  zh: 80b15177561766d7
 /session-persistence-event-catalog/resolved-persistence-types/decision-durationms-exitcode-handlerid:
   en: a99ac57bbec0370f
   zh: 9073329e324a66e0
@@ -2013,8 +2013,8 @@
   en: 0b74295f7c5c8f11
   zh: 5f1213cec87f6be0
 /session-persistence-event-catalog/resolved-persistence-types/kind-working-directory:
-  en: 99f0a2f919346cc0
-  zh: 9767c6db745dc330
+  en: 8a722e1eacc1959f
+  zh: 5be4380ecc36b55c
 /session-persistence-event-catalog/resolved-persistence-types/maxtokens-messages-model-provider:
   en: 870d7e470deb8d53
   zh: 7d5897ad2f2f870f
